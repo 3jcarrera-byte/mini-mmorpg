@@ -8,8 +8,6 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-
-
 // Base de datos simulada en memoria con el usuario admin por defecto
 const usersDB = {
     'admin': { 
@@ -23,11 +21,6 @@ const charactersDB = {
         { id: 999, name: 'GM_Admin', classType: 'guerrero', level: 99, hp: 500 }
     ]
 };
-
-
-// Base de datos simulada en memoria
-const usersDB = {};
-const charactersDB = {};
 
 io.on('connection', (socket) => {
     let currentUser = null;
