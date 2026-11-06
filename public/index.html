@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survival 3D - Dark Edition</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Librerías Core -->
+    <script src="https://cloudflare.com"></script>
+    <script src="https://socket.io"></script>
+</head>
+<body>
+
+    <!-- PANTALLA 1: LOGIN -->
+    <div id="screen-login" class="screen active">
+        <div class="box">
+            <h2>SURVIVAL 3D</h2>
+            <input type="text" id="login-user" placeholder="USUARIO">
+            <input type="password" id="login-pass" placeholder="CONTRASEÑA">
+            <button onclick="App.changeScreen('screen-character')">CONECTAR AL REINO</button>
+            <div class="links">
+                <a href="#" onclick="App.changeScreen('screen-register')">REGISTRARSE</a> | 
+                <a href="#" onclick="alert('En desarrollo.')">OLVIDÉ MI CONTRASEÑA</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA 2: REGISTRO -->
+    <div id="screen-register" class="screen">
+        <div class="box">
+            <h2>NUEVA CUENTA</h2>
+            <input type="text" id="reg-user" placeholder="USUARIO">
+            <input type="email" id="reg-email" placeholder="CORREO">
+            <input type="password" id="reg-pass" placeholder="CONTRASEÑA">
+            <button onclick="App.changeScreen('screen-login')">CREAR CUENTA</button>
+            <div class="links"><a href="#" onclick="App.changeScreen('screen-login')">VOLVER</a></div>
+        </div>
+    </div>
+
+    <!-- PANTALLA 3 Y 4: SELECCIÓN CINEMÁTICA -->
+    <div id="screen-character" class="screen full-cinematic">
+        <canvas id="charCanvas" class="cinematic-canvas"></canvas>
+
+        <!-- FLECHAS INTERACTIVAS (Solo para el nuevo héroe) -->
+        <button onclick="CharacterCreator.nextSkin(-1)" class="btn-arrow arrow-left">&lt;</button>
+        <button onclick="CharacterCreator.nextSkin(1)" class="btn-arrow arrow-right">&gt;</button>
+
+        <div class="panel-top-name">
+            <h2 id="ui-current-name">SELECCIONAR HÉROE</h2>
+        </div>
+
+        <div class="panel-left-actions">
+            <button onclick="CharacterCreator.openCreatorMode()" id="btn-trigger-creator">+ FORJAR NUEVO HÉROE</button>
+            <div id="account-characters" style="margin-top: 20px;"></div>
+        </div>
+
+        <div id="panel-right-creator" class="panel-right" style="display: none;">
+            <h3>NUEVO HÉROE</h3>
+            <input type="text" id="char-name" placeholder="NOMBRE ANCESTRAL" maxlength="16">
+            <p style="font-size: 11px; color: #ffd700; margin-top: 10px;">Usa las flechas del escenario para elegir tu Clase/Color.</p>
+            <button onclick="CharacterCreator.saveNewCharacter()">CONSERVAR HÉROE</button>
+            <button onclick="CharacterCreator.cancelCreatorMode()" class="btn-secondary">CANCELAR</button>
+        </div>
+
+        <div class="panel-bottom">
+            <div style="display: flex; gap: 20px; align-items: center; justify-content: center; margin-bottom: 10px;">
+                <span style="color: #ffd700; font-size: 14px; letter-spacing: 1px;">REINO:</span>
+                <select id="server-select" style="width: 200px; margin: 0;">
+                    <option value="local">GLOBAL REALM [ONLINE]</option>
+                </select>
+            </div>
+            <button id="btn-enter-world" onclick="Game.start()" class="btn-large">ENTRAR AL MUNDO</button>
+        </div>
+    </div>
+
+    <!-- PANTALLA 5: EL MAPA DEL SERVIDOR -->
+    <div id="screen-game" class="screen">
+        <div class="game-container">
+            <canvas id="mapCanvas" width="800" height="600"></canvas>
+            <div class="hud">
+                [WASD] Caminar | [Click Izq] Construir Pared (10 Madera) | [Click Der] Cambiar Elemento<br>
+                Material: <span id="ui-build">MADERA</span> | Madera Disponible: <span id="ui-wood">100</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/character.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
