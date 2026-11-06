@@ -1,134 +1,95 @@
-const CharacterCreator = {
-    renderer: null, scene: null, camera: null, mesh: null,
-    savedCharacters: [
-        { name: "BARBARO_KOR", color: "#ff4444" },
-        { name: "SORCERER_MU", color: "#4488ff" }
-    ],
-    currentIndex: 0,
-    isCreatingNew: false,
-    availableSkins: ["#ff4444", "#4488ff", "#44ff44", "#ffaa00", "#ffffff", "#8844ff"],
-    currentSkinIndex: 0,
+// Renderizador 3D para Selección/Creación estilo Diablo
+const CharacterModule = (() => {
+    let scene, camera, renderer;
+    let meshes = {};
+    let currentClassIndex = 0;
+    const classes = [
+        { id: 'guerrero', name: 'Guerrero', color: 0xff0033 },
+        { id: 'mago', name: 'Mago', color: 0x0088ff },
+        { id: 'arquero', name: 'Arquero', color: 0x00ff66 }
+    ];
 
-    init() {
-        const canvas = document.getElementById('charCanvas');
+    function init3D() {
+        const canvas = document.getElementById('characterCanvas');
         if (!canvas) return;
 
-        // 1. Crear Escena con Fondo Gris Industrial Claro para comprobar que exista
-        this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x222225); 
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.15);
 
-        // 2. Configuración de Cámara Frontal Fija
-        this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-        this.camera.position.set(0, 0, 4); 
-        this.camera.lookAt(0, 0, 0);
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.5, 4);
 
-        // 3. Inicializar Renderizador
-        if (!this.renderer) {
-            this.renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-        }
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
 
-        // 4. Crear Personaje (Cápsula autoiluminada)
-        if (this.mesh) this.scene.remove(this.mesh);
-        
-        const geo = new THREE.CylinderGeometry(0.4, 0.4, 1.8, 16);
-        const mat = new THREE.MeshBasicMaterial({ color: 0xff4444 }); 
-        this.mesh = new THREE.Mesh(geo, mat);
-        this.mesh.position.set(0, 0, 0); 
-        this.scene.add(this.mesh);
+        // Luces Cinemáticas
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
 
-        // Ajustes de los páneles de la interfaz
-        this.isCreatingNew = false;
-        document.getElementById('panel-right-creator').style.display = "none";
-        document.getElementById('btn-trigger-creator').style.display = "block";
-        document.querySelectorAll('.btn-arrow').forEach(b => b.style.display = "none");
-        
-        this.renderAccountCharacters();
-        this.selectCharacter(0);
+        const pointLight = new THREE.PointLight(0xffd700, 2, 10);
+        pointLight.position.set(0, 3, 2);
+        scene.add(pointLight);
 
-        // Renderizado inicial forzado
-        this.renderer.render(this.scene, this.camera);
+        // Crear Mallas de los personajes
+        classes.forEach((c, idx) => {
+            const geo = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 16);
+            const mat = new THREE.MeshPhongMaterial({ color: c.color, emissive: 0x111111 });
+            const mesh = new THREE.Mesh(geo, mat);
+            
+            // Cabeza
+            const headGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            const headMat = new THREE.MeshPhongMaterial({ color: 0xffd700 });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 0.8;
+            mesh.add(head);
 
-        // Loop de animación
-        this.animate();
-    },
-
-    renderAccountCharacters() {
-        const container = document.getElementById('account-characters');
-        if (!container) return;
-        container.innerHTML = "";
-        
-        this.savedCharacters.forEach((char, index) => {
-            const slot = document.createElement('div');
-            slot.className = `char-slot ${index === this.currentIndex && !this.isCreatingNew ? 'selected' : ''}`;
-            slot.innerText = char.name;
-            slot.onclick = () => { if (!this.isCreatingNew) this.selectCharacter(index); };
-            container.appendChild(slot);
+            mesh.position.set((idx - 1) * 2, 0, 0); // Separación horizontal
+            scene.add(mesh);
+            meshes[c.id] = mesh;
         });
-    },
 
-    selectCharacter(index) {
-        if (this.savedCharacters.length === 0) return;
-        this.currentIndex = index;
-        this.isCreatingNew = false;
-        this.renderAccountCharacters();
+        window.addEventListener('resize', onWindowResize);
+        animate();
+    }
 
-        const char = this.savedCharacters[index];
-        document.getElementById('ui-current-name').innerText = char.name;
-        if (this.mesh) this.mesh.material.color.set(char.color);
-        document.getElementById('btn-enter-world').style.display = "block";
-    },
-
-    openCreatorMode() {
-        this.isCreatingNew = true;
-        document.getElementById('panel-right-creator').style.display = "block";
-        document.getElementById('btn-trigger-creator').style.display = "none";
-        document.getElementById('ui-current-name').innerText = "FORJANDO NUEVO HÉROE";
-        document.getElementById('btn-enter-world').style.display = "none";
-        document.querySelectorAll('.btn-arrow').forEach(b => b.style.display = "block"); 
-        
-        this.currentSkinIndex = 0;
-        this.updateMeshSkin();
-    },
-
-    nextSkin(direction) {
-        if (!this.isCreatingNew) return;
-        this.currentSkinIndex += direction;
-        if (this.currentSkinIndex >= this.availableSkins.length) this.currentSkinIndex = 0;
-        if (this.currentSkinIndex < 0) this.currentSkinIndex = this.availableSkins.length - 1;
-        this.updateMeshSkin();
-    },
-
-    updateMeshSkin() {
-        if (this.mesh) {
-            this.mesh.material.color.set(this.availableSkins[this.currentSkinIndex]);
-        }
-    },
-
-    cancelCreatorMode() {
-        // Ejecuta la limpieza volviendo al estado base
-        this.init();
-    },
-
-    saveNewCharacter() {
-        const name = document.getElementById('char-name').value.trim().toUpperCase();
-        const color = this.availableSkins[this.currentSkinIndex];
-        if (!name) { alert("¡Ponle un nombre!"); return; }
-        this.savedCharacters.push({ name, color });
-        this.init();
-        this.selectCharacter(this.savedCharacters.length - 1);
-    },
-
-    getSelectedCharacter() {
-        return this.savedCharacters[this.currentIndex] || { name: "DESCONOCIDO", color: "#ffffff" };
-    },
-
-    animate() {
-        requestAnimationFrame(() => this.animate());
-        if (this.mesh) this.mesh.rotation.y += 0.01; 
-        if (this.renderer && this.scene && this.camera) {
-            this.renderer.render(this.scene, this.camera);
+    function animate() {
+        requestAnimationFrame(animate);
+        Object.keys(meshes).forEach(key => {
+            meshes[key].rotation.y += 0.01;
+        });
+        if (renderer && scene && camera) {
+            renderer.render(scene, camera);
         }
     }
-};
+
+    function onWindowResize() {
+        if (!camera || !renderer) return;
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function focusClass(index) {
+        currentClassIndex = (index + classes.length) % classes.length;
+        const targetClass = classes[currentClassIndex];
+        
+        // Mover cámara suavemente al modelo enfocado
+        const targetMesh = meshes[targetClass.id];
+        if (targetMesh) {
+            camera.position.x = targetMesh.position.x;
+        }
+
+        document.getElementById('char-display-name').innerText = targetClass.name.toUpperCase();
+        return targetClass;
+    }
+
+    return {
+        init3D,
+        focusClass,
+        getClasses: () => classes,
+        getCurrentClass: () => classes[currentClassIndex],
+        nextClass: () => focusClass(currentClassIndex + 1),
+        prevClass: () => focusClass(currentClassIndex - 1)
+    };
+})();
