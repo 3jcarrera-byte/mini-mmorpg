@@ -1,8 +1,8 @@
 // Motor 3D de Selección y Creación estilo Albion Online
 const CharacterModule = (() => {
     let scene, camera, renderer;
-    let characterMeshes = []; // Almacena los personajes creados presentes en la escena
-    let classCreationMeshes = {}; // Almacena las mallas para la pantalla de creación
+    let characterMeshes = []; 
+    let classCreationMeshes = {}; 
     let selectedCharacterData = null;
     let isCreationMode = false;
     let raycaster = new THREE.Raycaster();
@@ -22,13 +22,13 @@ const CharacterModule = (() => {
         scene.fog = new THREE.FogExp2(0x000000, 0.08);
 
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 2.2, 5.5);
+        camera.position.set(0, 1.8, 5.0);
 
         renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
 
-        // Iluminación Escénica
+        // Iluminación
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
@@ -36,8 +36,8 @@ const CharacterModule = (() => {
         spotLight.position.set(0, 6, 4);
         scene.add(spotLight);
 
-        // Suelo / Pedestal Estilo Albion
-        const floorGeo = new THREE.CylinderGeometry(4, 4, 0.2, 32);
+        // Suelo / Pedestal Central
+        const floorGeo = new THREE.CylinderGeometry(3.5, 3.5, 0.2, 32);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.position.y = -0.1;
@@ -45,24 +45,23 @@ const CharacterModule = (() => {
 
         // Modelos de selección de clase en Modo Creación
         classes.forEach((c, idx) => {
-            const group = createCharacterMesh(c.color, `${c.name}`);
+            const group = createCharacterMesh(c.color, `${c.name.toUpperCase()}`);
             group.position.set((idx - 1) * 2, 0, 0);
             group.visible = false;
             scene.add(group);
             classCreationMeshes[c.id] = group;
         });
 
-        // Evento Clic en el Canvas 3D para Seleccionar Personajes (Raycaster)
         canvas.addEventListener('click', onCanvasClick);
         window.addEventListener('resize', onWindowResize);
         animate();
     }
 
-    // Helper para construir malla 3D de personaje con etiqueta de nombre flotante
+    // Constructor de malla 3D con texto flotante LIMPIO (Sin recuadro negro)
     function createCharacterMesh(colorHex, labelText) {
         const group = new THREE.Group();
         
-        // Cuerpo
+        // Cuerpo (Cilindro centrado en x=0, z=0 exactos sobre el texto)
         const bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 16);
         const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
         const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -76,62 +75,66 @@ const CharacterModule = (() => {
         head.position.y = 1.4;
         group.add(head);
 
-        // Etiqueta 3D Flotante con Nombre
-        const labelSprite = createTextSprite(labelText);
-        labelSprite.position.set(0, 1.9, 0);
+        // Etiqueta 3D Flotante Transparente (SIN fondo negro)
+        const labelSprite = createTransparentTextSprite(labelText);
+        labelSprite.position.set(0, 1.9, 0); // Justo arriba de la cabeza
         group.add(labelSprite);
 
         return group;
     }
 
-    function createTextSprite(text) {
+    // Generador de Textura de Texto 100% Transparente (Elimina el recuadro negro)
+    function createTransparentTextSprite(text) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = 256;
-        canvas.height = 64;
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = '#ffd700';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(0, 0, canvas.width, canvas.height);
-        ctx.font = 'bold 20px "Courier New", monospace';
-        ctx.fillStyle = '#ffffff';
+        canvas.width = 512;
+        canvas.height = 128;
+        
+        // Sin fondo (transparente por defecto)
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Estilo de texto nítido estilo MMORPG
+        ctx.font = 'bold 36px "Courier New", monospace';
+        ctx.fillStyle = '#ffd700'; // Dorado brillante
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        
+        // Sombra suave para legibilidad sin recuadros
+        ctx.shadowColor = '#000000';
+        ctx.shadowBlur = 8;
         ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const sprite = new THREE.Sprite(spriteMat);
-        sprite.scale.set(1.6, 0.4, 1);
+        sprite.scale.set(1.8, 0.45, 1);
         return sprite;
     }
 
-    // Renderiza la lista de personajes del usuario en el espacio 3D en pedestales
+    // Renderiza los personajes del usuario centrados en la escena 3D
     function renderUserCharacters3D(characterList) {
-        // Limpiar mallas anteriores
         characterMeshes.forEach(m => scene.remove(m));
         characterMeshes = [];
 
         if (isCreationMode) return;
 
         const count = characterList.length;
-        const spacing = 1.8;
+        const spacing = 2.0;
 
         characterList.forEach((char, idx) => {
             const classColor = char.classType === 'mago' ? 0x0088ff : (char.classType === 'arquero' ? 0x00ff66 : 0xff0033);
             const posX = (idx - (count - 1) / 2) * spacing;
 
-            const meshGroup = createCharacterMesh(classColor, `${char.name}\nLv.${char.level || 1}`);
+            const meshGroup = createCharacterMesh(classColor, `${char.name} (Lv.${char.level || 1})`);
             meshGroup.position.set(posX, 0, 0);
-            meshGroup.userData = char; // Asignar datos del personaje a la malla 3D
+            meshGroup.userData = char; // Asociar los datos reales del personaje a la figura 3D
 
             scene.add(meshGroup);
             characterMeshes.push(meshGroup);
         });
     }
 
-    // Detección de clic directo en el personaje 3D (Estilo Albion)
+    // Selección por Clic Directo en la figura 3D (Raycaster)
     function onCanvasClick(event) {
         if (isCreationMode) return;
 
@@ -144,17 +147,16 @@ const CharacterModule = (() => {
         const intersects = raycaster.intersectObjects(characterMeshes, true);
 
         if (intersects.length > 0) {
-            // Encontrar el grupo principal del personaje tocado
             let target = intersects[0].object;
             while (target.parent && target.parent !== scene) {
                 target = target.parent;
             }
 
-            if (target.userData) {
+            if (target.userData && target.userData.id) {
                 selectedCharacterData = target.userData;
                 highlightSelectedMesh(target);
-                
-                // Disparar evento global de selección
+
+                // Notificar a app.js que este personaje 3D fue seleccionado
                 if (window.onCharacter3DSelected) {
                     window.onCharacter3DSelected(selectedCharacterData);
                 }
@@ -165,38 +167,44 @@ const CharacterModule = (() => {
     function highlightSelectedMesh(selectedGroup) {
         characterMeshes.forEach(group => {
             group.scale.set(1, 1, 1);
+            // Restablecer brillo de materiales
+            group.traverse(child => {
+                if (child.material && child.material.emissive) child.material.emissive.setHex(0x000000);
+            });
         });
-        // Escalar ligeramente el personaje seleccionado
+
+        // Destacar visualmente el personaje seleccionado
         selectedGroup.scale.set(1.15, 1.15, 1.15);
+        selectedGroup.traverse(child => {
+            if (child.material && child.material.emissive) child.material.emissive.setHex(0x332200);
+        });
     }
 
     function setCreationMode(active) {
         isCreationMode = active;
-        
-        // Ocultar personajes del usuario si entramos a creación
         characterMeshes.forEach(m => m.visible = !active);
 
-        // Mostrar avatares de clase
         Object.keys(classCreationMeshes).forEach(key => {
             classCreationMeshes[key].visible = active;
         });
 
-        document.getElementById('panel-top-name').style.display = active ? 'block' : 'none';
-        document.getElementById('btn-arrow-left').style.display = active ? 'block' : 'none';
-        document.getElementById('btn-arrow-right').style.display = active ? 'block' : 'none';
+        const topName = document.getElementById('panel-top-name');
+        const arrowLeft = document.getElementById('btn-arrow-left');
+        const arrowRight = document.getElementById('btn-arrow-right');
+
+        if (topName) topName.style.display = active ? 'block' : 'none';
+        if (arrowLeft) arrowLeft.style.display = active ? 'block' : 'none';
+        if (arrowRight) arrowRight.style.display = active ? 'block' : 'none';
 
         if (active) focusClass(0);
     }
 
     function animate() {
         requestAnimationFrame(animate);
-        
-        // Rotación continua de los personajes en la escena
         characterMeshes.forEach(m => m.rotation.y += 0.005);
         Object.keys(classCreationMeshes).forEach(k => {
             if (classCreationMeshes[k].visible) classCreationMeshes[k].rotation.y += 0.01;
         });
-
         if (renderer && scene && camera) renderer.render(scene, camera);
     }
 
@@ -213,7 +221,8 @@ const CharacterModule = (() => {
         const targetClass = classes[currentClassIndex];
         const targetMesh = classCreationMeshes[targetClass.id];
         if (targetMesh) camera.position.x = targetMesh.position.x;
-        document.getElementById('char-display-name').innerText = `CLASE: ${targetClass.name.toUpperCase()}`;
+        const nameEl = document.getElementById('char-display-name');
+        if (nameEl) nameEl.innerText = `CLASE: ${targetClass.name.toUpperCase()}`;
         return targetClass;
     }
 
