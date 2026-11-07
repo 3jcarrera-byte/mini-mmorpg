@@ -16,7 +16,7 @@ const Game = {
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
         weaponRange: 15.0,
-        radius: 0.4 // Radio físico del jugador ensanchado ligeramente para evitar solapamientos
+        radius: 0.2 // Radio físico ajustado al tamaño real del personaje
     },
     remotePlayers: {},
     keys: {},
@@ -238,7 +238,7 @@ const Game = {
         }
     },
 
-    // --- DETECTOR DE COLISIONES ROBUSTO (ÁRBOLES Y ROCAS) ---
+    // --- DETECTOR DE COLISIONES CON RADIO AJUSTADO Y CONTACTO CERCANO ---
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -251,22 +251,20 @@ const Game = {
 
         if (!obstacles || obstacles.length === 0) return false;
 
-        const playerRadius = this.localPlayer.radius;
+        const playerRadius = this.localPlayer.radius; // 0.2
 
         for (let i = 0; i < obstacles.length; i++) {
             const obs = obstacles[i];
             const obsPos = obs.position || obs; 
             if (!obsPos) continue;
 
-            // Distancia directa en 3D sobre la superficie esférica
             const dist = nextPos.distanceTo(obsPos);
-            const obstacleRadius = obs.radius || 0.45;
-            const obstacleHeight = obs.height || 0.8;
+            const obstacleRadius = obs.radius || 0.22; // Radio ajustado para evitar campos de fuerza lejanos
+            const obstacleHeight = obs.height || 0.6;
 
-            // Comprobación de choque horizontal y de altura (si no está saltando por encima)
             if (dist < (playerRadius + obstacleRadius)) {
                 if (currentAltitude < obstacleHeight) {
-                    return true; // Colisión detectada: frena el movimiento
+                    return true; // Colisión activa: bloquea paso en punto de contacto ajustado
                 }
             }
         }
@@ -334,7 +332,7 @@ const Game = {
 
             targetPos.normalize().multiplyScalar(R + p.altitude);
 
-            // Validar si el movimiento choca con árboles/rocas antes de aplicarlo
+            // Validar si la nueva posición colisiona con el radio ajustado
             if (!this.checkCollision(targetPos, p.altitude)) {
                 p.position.copy(targetPos);
                 p.forward.copy(tempForward);
