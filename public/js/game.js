@@ -11,13 +11,11 @@ const Game = {
             this.localPlayer.level = characterData.level || 1;
             this.localPlayer.classType = characterData.classType || 'guerrero';
             
-            // Asignar color según la clase o datos
             if (characterData.classType === 'mago') this.localPlayer.color = 0x0088ff;
             else if (characterData.classType === 'arquero') this.localPlayer.color = 0x00ff66;
             else this.localPlayer.color = 0xff0033;
         }
 
-        // Cambio de pantalla seguro
         if (typeof App !== 'undefined' && typeof App.changeScreen === 'function') {
             App.changeScreen('screen-game');
         } else {
@@ -61,11 +59,9 @@ const Game = {
         this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
         this.scene.add(this.localPlayer.mesh);
 
-        // Actualizar etiqueta del HUD con el nombre
         const hudName = document.getElementById('hud-char-name');
         if (hudName) hudName.innerText = `${this.localPlayer.name} (Lv.${this.localPlayer.level})`;
 
-        // Eventos de teclado
         window.addEventListener('keydown', e => this.keys[e.code] = true);
         window.addEventListener('keyup', e => this.keys[e.code] = false);
 
@@ -95,7 +91,6 @@ const Game = {
 
     connectServer() {
         this.socket = io();
-
         this.socket.on('initWorld', (data) => {
             const woodEl = document.getElementById('ui-wood');
             if (woodEl) woodEl.innerText = this.localPlayer.wood;
@@ -104,7 +99,6 @@ const Game = {
 
     handleBuildClick(e) {
         if (e.button === 0) {
-            // Clic izquierdo: construir en superficie (depth: 0) o búnker subterráneo con Shift (depth: -1)
             const depth = e.shiftKey ? -1 : 0;
         }
     },
@@ -114,27 +108,27 @@ const Game = {
         requestAnimationFrame(() => this.loop());
 
         if (this.localPlayer.mesh) {
-            // Actualizar movimiento esférico desde el módulo de mundo
             const playerInfo = WorldModule.updatePlayerOnSphere(this.localPlayer.mesh, this.keys);
 
-            // --- VISTA ISOMÉTRICA / TERCERA PERSONA ORIENTADA HACIA DONDE MIRA EL PERSONAJE ---
-            // Calculamos un vector de offset elevado y detrás del personaje respecto al centro del planeta
+            // --- VISTA ISOMÉTRICA / ESTRATÉGICA TIPO WARCRAFT 3 ---
             const playerPos = playerInfo.position;
-            const normal = playerPos.clone().normalize(); // Dirección hacia afuera desde el núcleo
+            const normal = playerPos.clone().normalize(); // Vector desde el centro del planeta hacia el jugador
 
-            // Posición de la cámara: Alejada en dirección normal (altura) y un poco hacia atrás
-            const camDistance = 4.5;
-            const camHeight = 2.5;
+            // Distancia y altura isométrica diagonal respecto al personaje
+            const distanceBack = 5.0; // Qué tan atrás se coloca
+            const heightUp = 4.5;     // Qué tan arriba se eleva
 
-            // Tomamos la posición del jugador y la desplazamos radialmente hacia afuera y alineada
-            const camTargetPos = playerPos.clone()
-                .add(normal.clone().multiplyScalar(camHeight))
-                .add(playerPos.clone().normalize().multiplyScalar(-camDistance));
-
-            // Suavizado de cámara (Lerp) para que el movimiento sea fluido estilo Diablo/Rust
-            this.camera.position.lerp(camTargetPos, 0.15);
+            // Calculamos la posición de la cámara alejándose del núcleo, pero desplazada hacia atrás en la esfera
+            const tangentOffset = playerPos.clone().normalize().cross(new THREE.Vector3(0, 1, 0)).normalize();
             
-            // La cámara siempre apunta ligeramente por delante o directamente al personaje
+            const camTargetPos = playerPos.clone()
+                .add(normal.clone().multiplyScalar(heightUp))
+                .add(playerPos.clone().normalize().multiplyScalar(-distanceBack));
+
+            // Suavizado fluido de la cámara
+            this.camera.position.lerp(camTargetPos, 0.12);
+            
+            // Apuntar directamente al personaje para verlo completo de cuerpo entero
             this.camera.lookAt(playerPos);
         }
 
