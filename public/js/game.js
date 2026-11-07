@@ -9,8 +9,7 @@ const Game = {
         classType: 'guerrero', 
         color: 0xff0033,
         position: new THREE.Vector3(0, 5.0, 0),
-        quaternion: new THREE.Quaternion(), // Orientación 3D exacta sobre la esfera
-        heading: 0, 
+        forward: new THREE.Vector3(0, 0, -1), // Vector frontal tangente local
         pitch: 0 
     },
     remotePlayers: {},
@@ -73,8 +72,7 @@ const Game = {
 
         // Posición inicial sobre el planeta
         this.localPlayer.position.set(0, this.planetRadius, 0);
-        this.localPlayer.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 1, 0));
-        this.localPlayer.heading = 0;
+        this.localPlayer.forward.set(0, 0, -1).normalize();
         this.localPlayer.pitch = 0;
 
         // Crear malla del jugador local (oculta en primera persona)
@@ -101,7 +99,14 @@ const Game = {
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.0025;
-                this.localPlayer.heading += e.movementX * sensitivity;
+                const normal = this.localPlayer.position.clone().normalize();
+                
+                // Rotar el vector forward alrededor de la normal local (Yaw / Giro horizontal)
+                const yawDelta = -e.movementX * sensitivity;
+                this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
+                this.localPlayer.forward.normalize();
+
+                // Pitch (Inclinación vertical)
                 this.localPlayer.pitch += e.movementY * sensitivity;
                 this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
             }
@@ -179,19 +184,11 @@ const Game = {
             let isMoving = false;
 
             const R = this.planetRadius;
-            const normal = p.position.clone().normalize();
+            let normal = p.position.clone().normalize();
 
-            // --- SISTEMA DE NAVEGACIÓN BASADO EN MATRIZ DE ORIENTACIÓN LOCAL ---
-            // Orientamos el objeto avatar según la normal del planeta
-            const upVector = new THREE.Vector3(0, 1, 0);
-            const alignQuat = new THREE.Quaternion().setFromUnitVectors(upVector, normal);
-            
-            // Vector frontal en el plano horizontal según el giro del mouse (heading)
-            const forwardLocal = new THREE.Vector3(Math.sin(p.heading), 0, Math.cos(p.heading));
-            forwardLocal.applyQuaternion(alignQuat);
-            forwardLocal.addScaledVector(normal, -forwardLocal.dot(normal)).normalize();
-
-            const rightLocal = new THREE.Vector3().crossVectors(normal, forwardLocal).normalize();
+            // Garantizar que forward sea estrictamente tangente a la superficie de la esfera
+            p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
+            const right = new THREE.Vector3().crossVectors(normal, p.forward).normalize();
 
             // --- CONTROLES WASD ---
             let moveForward = 0;
@@ -212,21 +209,25 @@ const Game = {
                 }
             }
 
-            if (moveForward !== 0 || moveSide !== 0) {
-                // Generar vector de velocidad pura
-                const moveDirection = new THREE.Vector3();
-                moveDirection.addScaledVector(forwardLocal, moveForward);
-                moveDirection.addScaledVector(rightLocal, moveSide);
-
-                // Calcular eje de rotación esférica (perpendicular al movimiento y a la normal)
-                const rotationAxis = new THREE.Vector3().crossVectors(normal, moveDirection).normalize();
-                const angle = moveDirection.length() / R;
-
-                // Aplicar rotación sobre el centro del planeta
-                const stepQuat = new THREE.Quaternion().setFromAxisAngle(rotationAxis, angle);
-                p.position.applyQuaternion(stepQuat);
-                p.position.normalize().multiplyScalar(R);
+            // Desplazamiento esférico continuo y sin singularidades en los polos
+            if (moveForward !== 0) {
+                const axis = new THREE.Vector3().crossVectors(normal, p.forward).normalize();
+                const angle = moveForward / R;
+                p.position.applyAxisAngle(axis, angle);
+                p.forward.applyAxisAngle(axis, angle);
             }
+
+            if (moveSide !== 0) {
+                const axis = new THREE.Vector3().crossVectors(normal, right).normalize();
+                const angle = moveSide / R;
+                p.position.applyAxisAngle(axis, angle);
+                p.forward.applyAxisAngle(axis, angle);
+            }
+
+            // Re-normalizar posición y forzar radio exacto del planeta
+            p.position.normalize().multiplyScalar(R);
+            normal = p.position.clone().normalize();
+            p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
 
             p.mesh.position.copy(p.position);
 
@@ -235,24 +236,15 @@ const Game = {
             }
 
             // --- CÁMARA EN PRIMERA PERSONA ESTABLE ---
-            const newNormal = p.position.clone().normalize();
             const eyeHeight = 0.75;
-            const eyePosition = p.position.clone().add(newNormal.clone().multiplyScalar(eyeHeight));
+            const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
             this.camera.position.copy(eyePosition);
 
-            this.camera.up.copy(newNormal);
+            // Gravedad local de la cámara orientada a la normal
+            this.camera.up.copy(normal);
 
-            // Re-calcular vector de vista con la nueva normal
-            const newAlignQuat = new THREE.Quaternion().setFromUnitVectors(upVector, newNormal);
-            const newForward = new THREE.Vector3(Math.sin(p.heading), 0, Math.cos(p.heading));
-            newForward.applyQuaternion(newAlignQuat);
-            newForward.addScaledVector(newNormal, -newForward.dot(newNormal)).normalize();
-
-            const newRight = new THREE.Vector3().crossVectors(newNormal, newForward).normalize();
-
-            // Aplicar inclinación vertical (pitch)
-            const lookDir = newForward.clone();
-            lookDir.applyAxisAngle(newRight, p.pitch);
+            const lookDir = p.forward.clone();
+            lookDir.applyAxisAngle(right, p.pitch);
 
             const targetLookAt = eyePosition.clone().add(lookDir.multiplyScalar(5.0));
             this.camera.lookAt(targetLookAt);
