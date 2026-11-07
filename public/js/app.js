@@ -81,6 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('panel-create-controls').style.display = 'flex';
         document.getElementById('btn-to-create').style.display = 'none';
         document.getElementById('btn-play').style.display = 'none';
+        const deleteBtn = document.getElementById('btn-delete-hero');
+        if (deleteBtn) deleteBtn.style.display = 'none';
         
         // Activar visualización 3D de avatares de clase para crear
         CharacterModule.setCreationMode(true);
@@ -98,6 +100,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (selectedCharacter) {
             document.getElementById('btn-play').style.display = 'block';
+            const deleteBtn = document.getElementById('btn-delete-hero');
+            if (deleteBtn) deleteBtn.style.display = 'block';
         }
     });
 
@@ -122,14 +126,74 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // --- LÓGICA DEL BOTÓN Y MODAL DE ELIMINAR HÉROE ---
+    const btnDeleteHero = document.getElementById('btn-delete-hero');
+    const deleteModal = document.getElementById('delete-modal');
+    const deleteWarningText = document.getElementById('delete-warning-text');
+    const deleteConfirmInput = document.getElementById('delete-confirm-input');
+    const btnConfirmDelete = document.getElementById('btn-confirm-delete');
+    const btnCancelDelete = document.getElementById('btn-cancel-delete');
+
+    let characterPendingDelete = null;
+
+    if (btnDeleteHero) {
+        btnDeleteHero.addEventListener('click', () => {
+            const selectedChar = CharacterModule.getSelectedCharacter();
+            if (!selectedChar) return alert("Selecciona un personaje primero.");
+
+            characterPendingDelete = selectedChar;
+            deleteWarningText.innerHTML = `Estás a punto de eliminar permanentemente a <strong style="color: #ffd700;">${selectedChar.name}</strong> (Nv. ${selectedChar.level || 1}).<br><br>¿Estás seguro de que deseas continuar?`;
+            deleteConfirmInput.value = '';
+            deleteModal.style.display = 'flex';
+        });
+    }
+
+    if (btnCancelDelete) {
+        btnCancelDelete.addEventListener('click', () => {
+            deleteModal.style.display = 'none';
+            characterPendingDelete = null;
+        });
+    }
+
+    if (btnConfirmDelete) {
+        btnConfirmDelete.addEventListener('click', () => {
+            if (!characterPendingDelete) return;
+
+            const typedName = deleteConfirmInput.value.trim();
+            if (typedName !== characterPendingDelete.name) {
+                alert("El nombre escrito no coincide con el del héroe.");
+                return;
+            }
+
+            // Emitir evento al servidor de Socket.io para borrar el personaje
+            socket.emit('character:delete', { characterId: characterPendingDelete._id || characterPendingDelete.id }, (res) => {
+                if (res && res.success) {
+                    currentUserCharacters = res.characters || [];
+                    selectedCharacter = null;
+                    document.getElementById('btn-play').style.display = 'none';
+                    btnDeleteHero.style.display = 'none';
+                    CharacterModule.renderUserCharacters3D(currentUserCharacters);
+                } else {
+                    alert(res?.message || 'Error al eliminar el personaje.');
+                }
+            });
+            
+            deleteModal.style.display = 'none';
+            characterPendingDelete = null;
+        });
+    }
+
     // Listener global cuando haces clic directamente en un personaje 3D en el canvas (Estilo Albion)
     window.onCharacter3DSelected = (char) => {
         selectedCharacter = char;
 
-        if (document.getElementById('panel-create-controls').style.display !== 'flex') {
+        if (document.getElementById('panel-create-controls').style.display !== 'flex' && char) {
             const playBtn = document.getElementById('btn-play');
             playBtn.style.display = 'block';
             playBtn.innerText = `JUGAR CON ${char.name.toUpperCase()}`;
+
+            const deleteBtn = document.getElementById('btn-delete-hero');
+            if (deleteBtn) deleteBtn.style.display = 'block';
         }
     };
 
@@ -147,7 +211,10 @@ document.addEventListener('DOMContentLoaded', () => {
         btnReturnMenu.addEventListener('click', () => {
             showScreen('screen-character');
             CharacterModule.renderUserCharacters3D(currentUserCharacters);
-            document.getElementById('btn-play').style.display = selectedCharacter ? 'block' : 'none';
+            const hasSelected = !!selectedCharacter;
+            document.getElementById('btn-play').style.display = hasSelected ? 'block' : 'none';
+            const deleteBtn = document.getElementById('btn-delete-hero');
+            if (deleteBtn) deleteBtn.style.display = hasSelected ? 'block' : 'none';
         });
     }
 
@@ -156,6 +223,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUserCharacters = [];
         document.getElementById('login-username').value = '';
         document.getElementById('login-password').value = '';
+        const deleteBtn = document.getElementById('btn-delete-hero');
+        if (deleteBtn) deleteBtn.style.display = 'none';
         showScreen('screen-login');
     });
 });
