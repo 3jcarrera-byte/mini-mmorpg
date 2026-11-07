@@ -179,25 +179,21 @@ const Game = {
             const R = this.planetRadius;
             const normal = p.position.clone().normalize();
 
-            // --- SISTEMA ANTIPOLOS ROBUSTO ---
-            // Si nos acercamos demasiado al polo norte o sur, cambiamos el vector de referencia auxiliar (worldUp)
-            let worldUp = new THREE.Vector3(0, 1, 0);
-            if (Math.abs(normal.dot(worldUp)) > 0.95) {
-                worldUp = new THREE.Vector3(0, 0, 1);
-            }
+            // --- CÁLCULO VECTORIAL LIBRE DE SINGULARIDADES (MATEMÁTICA PURA SOBRE LA ESFERA) ---
+            // Tomamos un vector de referencia seguro que nunca será paralelo absoluto en toda la esfera
+            let safeRef = Math.abs(normal.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+            const tangentX = new THREE.Vector3().crossVectors(normal, safeRef).normalize();
+            const tangentZ = new THREE.Vector3().crossVectors(normal, tangentX).normalize();
 
-            const east = new THREE.Vector3().crossVectors(worldUp, normal).normalize();
-            const north = new THREE.Vector3().crossVectors(normal, east).normalize();
-
-            // Dirección frontal estable proyectada limpiamente
+            // Dirección frontal alineada estrictamente con el heading del mouse en el plano tangente
             const forward = new THREE.Vector3()
-                .addScaledVector(north, Math.cos(p.heading))
-                .addScaledVector(east, Math.sin(p.heading))
+                .addScaledVector(tangentX, Math.sin(p.heading))
+                .addScaledVector(tangentZ, Math.cos(p.heading))
                 .normalize();
 
             const right = new THREE.Vector3().crossVectors(normal, forward).normalize();
 
-            // --- MOVIMIENTO WASD LINEAL Y DIRECTO ---
+            // --- MOVIMIENTO WASD ---
             let moveForward = 0;
             let moveSide = 0;
 
@@ -221,7 +217,7 @@ const Game = {
                 moveDelta.addScaledVector(forward, moveForward);
                 moveDelta.addScaledVector(right, moveSide);
 
-                // Evitar efecto de "peladora de naranja" proyectando estrictamente en el plano tangente y renormalizando
+                // Desplazamiento limpio proyectado en la esfera sin bloqueos ni paredes invisibles
                 p.position.add(moveDelta);
                 p.position.normalize().multiplyScalar(R);
             }
@@ -232,11 +228,12 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- CÁMARA PRIMERA PERSONA ---
+            // --- CÁMARA PRIMERA PERSONA ESTABLE ---
             const eyeHeight = 0.75;
             const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
             this.camera.position.copy(eyePosition);
 
+            // Gravedad local de la cámara limpia
             this.camera.up.copy(normal);
 
             const lookDir = forward.clone();
