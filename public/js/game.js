@@ -1,9 +1,21 @@
 const Game = {
     socket: null, scene: null, camera: null, renderer: null,
-    localPlayer: { mesh: null, speed: 0.05, wood: 100, name: 'Héroe', level: 1, classType: 'guerrero', color: 0xff0033 },
+    localPlayer: { 
+        mesh: null, 
+        speed: 0.06, 
+        wood: 100, 
+        name: 'Héroe', 
+        level: 1, 
+        classType: 'guerrero', 
+        color: 0xff0033,
+        theta: 0, 
+        phi: Math.PI / 2, 
+        heading: 0 // Ángulo de rotación del personaje
+    },
     remotePlayers: {},
     keys: {},
     isGameRunning: false,
+    planetRadius: 5.0,
 
     start(characterData) {
         if (characterData) {
@@ -54,8 +66,16 @@ const Game = {
 
         // --- CREAR EL PLANETA ESFÉRICO ---
         WorldModule.createPlanet(this.scene, { color: 0x1a4314, treeCount: 40, rockCount: 20 });
+        if (typeof WorldModule.getRadius === 'function') {
+            this.planetRadius = WorldModule.getRadius();
+        }
 
-        // Crear malla del jugador local con el avatar detallado y el color asignado
+        // Posición inicial sobre la esfera
+        this.localPlayer.theta = 0;
+        this.localPlayer.phi = 0.3;
+        this.localPlayer.heading = 0;
+
+        // Crear malla del jugador local con su visor indicador de dirección
         this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
         this.scene.add(this.localPlayer.mesh);
 
@@ -86,11 +106,11 @@ const Game = {
         head.position.y = 0.7;
         group.add(head);
 
-        // Visor / Parte frontal de la cara (Color diferente para indicar hacia dónde mira)
+        // Visor / Parte frontal (Indica claramente hacia dónde mira el personaje)
         const faceGeo = new THREE.BoxGeometry(0.14, 0.06, 0.05);
         const faceMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 });
         const face = new THREE.Mesh(faceGeo, faceMat);
-        face.position.set(0, 0.7, 0.1); // Posicionado al frente (+Z local)
+        face.position.set(0, 0.7, 0.12); // Al frente (+Z local)
         group.add(face);
 
         return group;
@@ -115,29 +135,85 @@ const Game = {
         requestAnimationFrame(() => this.loop());
 
         if (this.localPlayer.mesh) {
-            const playerInfo = WorldModule.updatePlayerOnSphere(this.localPlayer.mesh, this.keys);
+            const p = this.localPlayer;
+            const turnSpeed = 0.04;
 
-            // --- VISTA CERCANA Y FLUIDA (ESTILO ACCIÓN / TERCERA PERSONA) ---
-            const playerPos = playerInfo.position;
-            const normal = playerPos.clone().normalize(); // Dirección radial desde el núcleo
+            // Giro del personaje con las flechas de dirección (Izquierda / Derecha)
+            if (this.keys['ArrowLeft'] || this.keys['KeyQ']) p.heading += turnSpeed;
+            if (this.keys['ArrowRight'] || this.keys['KeyE']) p.heading -= turnSpeed;
 
-            // Distancia y altura equilibradas para ver perfectamente al personaje y el terreno cercano
-            const distanceBack = 3.2; 
-            const heightUp = 1.4;     
+            // Cálculo de movimiento relativo tipo Shooter (W = adelante, S = atrás, A = izq, D = der)
+            let moveForward = 0;
+            let moveSide = 0;
 
-            const camTargetPos = playerPos.clone()
-                .add(normal.clone().multiplyScalar(heightUp))
-                .add(playerPos.clone().normalize().multiplyScalar(-distanceBack));
+            if (this.keys['KeyW'] || this.keys['ArrowUp']) moveForward += p.speed;
+            if (this.keys['KeyS'] || this.keys['ArrowDown']) moveForward -= p.speed;
+            if (this.keys['KeyA']) moveSide -= p.speed; // Strafe izquierda
+            if (this.keys['KeyD']) moveSide += p.speed; // Strafe derecha
 
-            // Suavizado dinámico fluido para seguir los pasos del héroe sin tirones
-            this.camera.position.lerp(camTargetPos, 0.2);
-            
-            // Apuntar ligeramente por encima de los pies para centrar el cuerpo en pantalla
-            const lookTarget = playerPos.clone().add(normal.clone().multiplyScalar(0.4));
+            if (moveForward !== 0 || moveSide !== 0) {
+                const R = this.planetRadius;
+
+                // Vectores de desplazamiento basados en el heading actual del personaje sobre la esfera
+                const fwdDeltaTheta = (moveForward * Math.sin(p.heading) + moveSide * Math.cos(p.heading)) / R;
+                const fwdDeltaPhi   = (-moveForward * Math.cos(p.heading) + moveSide * Math.sin(p.heading)) / R;
+
+                p.theta += fwdDeltaTheta;
+                p.phi += fwdDeltaPhi;
+
+                // Restringir phi para no rebasar los polos
+                p.phi = Math.max(0.05, Math.min(Math.PI - 0.05, p.phi));
+            }
+
+            // Posición cartesiana final sobre la esfera
+            const R = this.planetRadius;
+            const x = R * Math.sin(p.phi) * Math.sin(p.theta);
+            const y = R * Math.cos(p.phi);
+            const z = R * Math.sin(p.phi) * Math.cos(p.theta);
+
+            p.mesh.position.set(x, y, z);
+
+            // Orientación física del avatar sobre la superficie esférica
+            const normal = p.mesh.position.clone().normalize();
+            let tangent = new THREE.Vector3(-Math.cos(p.heading), 0, Math.sin(p.heading));
+            tangent.addScaledVector(normal, -tangent.dot(normal)).normalize();
+
+            if (tangent.lengthSq() < 0.001) {
+                tangent.set(0, 0, 1);
+                tangent.addScaledVector(normal, -tangent.dot(normal)).normalize();
+            }
+
+            const binormal = new THREE.Vector3().crossVectors(normal, tangent).normalize();
+            const rotMatrix = new THREE.Matrix4().makeBasis(binormal, normal, tangent);
+            p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
+
+            if ((moveForward !== 0 || moveSide !== 0) && this.socket) {
+                this.socket.emit('playerMove', { x, y, z });
+            }
+
+            // --- CÁMARA TERCERA PERSONA DIRECTA DETRÁS DE LA ESPALDA ---
+            const camDistBack = 3.2;  // Distancia hacia atrás
+            const camHeightUp = 1.4;  // Altura sobre el hombro
+
+            // Dirección opuesta al heading (detrás del personaje)
+            const backwardDir = new THREE.Vector3(Math.sin(p.heading), 0, -Math.cos(p.heading)).normalize();
+            backwardDir.addScaledVector(normal, -backwardDir.dot(normal)).normalize();
+
+            const targetCamPos = p.mesh.position.clone()
+                .add(normal.clone().multiplyScalar(camHeightUp))
+                .add(backwardDir.multiplyScalar(camDistBack));
+
+            // Seguir con suavidad al personaje
+            this.camera.position.lerp(targetCamPos, 0.3);
+
+            // Apuntar la cámara exactamente hacia el frente del personaje
+            const lookTarget = p.mesh.position.clone().add(normal.clone().multiplyScalar(0.5));
             this.camera.lookAt(lookTarget);
         }
 
-        WorldModule.rotatePlanet();
+        if (typeof WorldModule.rotatePlanet === 'function') {
+            WorldModule.rotatePlanet();
+        }
         this.renderer.render(this.scene, this.camera);
     }
 };
