@@ -56,14 +56,17 @@ const WorldModule = (() => {
             mesh.position.set(x, y, z);
             mesh.lookAt(0, 0, 0);
             mesh.rotateX(Math.PI / 2);
+            
+            // Elevar levemente la malla para que la base quede alineada perfectamente con la superficie
+            mesh.position.addScaledVector(mesh.position.clone().normalize(), 0.05);
 
             scene.add(mesh);
 
-            // Registrar cada árbol y roca con radio ajustado y preciso
+            // Registrar cada árbol y roca con posición elevada real y radio compacto
             obstacles.push({
                 position: mesh.position.clone(),
-                radius: 0.22,   // Radio de colisión horizontal ajustado al cuerpo
-                height: 0.6     // Altura que se puede saltar
+                radius: 0.18,   // Radio de colisión horizontal compacto y justo
+                height: 0.35    // Altura reducida para que el jugador pueda rodearlos con total fluidez
             });
         }
     }
@@ -92,8 +95,8 @@ const WorldModule = (() => {
         // Registrar estructura construida como obstáculo con radio preciso
         obstacles.push({
             position: structureMesh.position.clone(),
-            radius: 0.3,
-            height: 0.4
+            radius: 0.25,
+            height: 0.3
         });
     }
 
