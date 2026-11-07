@@ -22,9 +22,10 @@ const CharacterModule = (() => {
         scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x000000, 0.08);
 
-        // Cámara posicionada para elevar la vista del personaje
+        // Cámara posicionada y apuntando más arriba para centrar el modelo en el canvas
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 2.2, 5.2);
+        camera.position.set(0, 2.7, 4.2);
+        camera.lookAt(0, 1.2, 0);
 
         renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -38,17 +39,17 @@ const CharacterModule = (() => {
         spotLight.position.set(0, 7, 4);
         scene.add(spotLight);
 
-        // Suelo / Pedestal Central Elevado en Y para no ser tapado por el menú
+        // Suelo / Pedestal Central Elevado
         const floorGeo = new THREE.CylinderGeometry(2.2, 2.2, 0.2, 32);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.position.y = 0.5; // Elevado de -0.1 a 0.5
+        floor.position.y = 0.5;
         scene.add(floor);
 
         // Mallas de clase en el centro elevado
         classes.forEach((c) => {
             const group = createCharacterMesh(c.color, `${c.name.toUpperCase()}`);
-            group.position.set(0, 1.0, 0); // Posición base sobre el pedestal elevado
+            group.position.set(0, 1.0, 0);
             group.visible = false;
             scene.add(group);
             classCreationMeshes[c.id] = group;
@@ -164,10 +165,12 @@ const CharacterModule = (() => {
         if (instruction) instruction.innerText = active ? 'SELECCIONA TU CLASE' : 'HAZ CLIC PARA CAMBIAR HÉROE';
 
         if (active) {
-            camera.position.set(0, 2.5, 4.6);
+            camera.position.set(0, 2.7, 4.2);
+            camera.lookAt(0, 1.2, 0);
             focusClass(0);
         } else {
             camera.position.set(0, 2.2, 5.2);
+            camera.lookAt(0, 1.0, 0);
             if (characterMeshes.length > 0) showUserCharacter(0);
         }
     }
