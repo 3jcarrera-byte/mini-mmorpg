@@ -53,7 +53,7 @@ const Game = {
         this.scene.background = new THREE.Color(0x050510);
         this.scene.fog = new THREE.FogExp2(0x050510, 0.03);
 
-        this.camera = new THREE.PerspectiveCamera(60, 800 / 600, 0.1, 1000);
+        this.camera = new THREE.PerspectiveCamera(65, 800 / 600, 0.1, 1000);
 
         this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
         this.renderer.setSize(800, 600);
@@ -82,8 +82,8 @@ const Game = {
         const hudName = document.getElementById('hud-char-name');
         if (hudName) hudName.innerText = `${this.localPlayer.name} (Lv.${this.localPlayer.level})`;
 
-        // --- CREAR MIRILLA (CROSSHAIR) EN EL HUD ---
-        this.createCrosshair();
+        // --- CREAR MIRILLA DINÁMICA (ENFOQUE OCULAR) ---
+        this.createDynamicCrosshair();
 
         // Eventos de teclado
         window.addEventListener('keydown', e => this.keys[e.code] = true);
@@ -91,14 +91,14 @@ const Game = {
 
         canvas.addEventListener('contextmenu', e => e.preventDefault());
         
-        // Activar Pointer Lock al hacer clic para girar la cámara con el mouse
+        // Activar Pointer Lock al hacer clic en el canvas para mover la vista ocular con el mouse
         canvas.addEventListener('click', () => {
             canvas.requestPointerLock();
         });
 
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
-                const sensitivity = 0.003;
+                const sensitivity = 0.0025;
                 this.localPlayer.heading -= e.movementX * sensitivity;
             }
         });
@@ -106,7 +106,7 @@ const Game = {
         canvas.addEventListener('mousedown', e => this.handleBuildClick(e));
     },
 
-    createCrosshair() {
+    createDynamicCrosshair() {
         const container = document.querySelector('.game-container');
         if (container && !document.getElementById('game-crosshair')) {
             const crosshair = document.createElement('div');
@@ -114,14 +114,26 @@ const Game = {
             crosshair.style.position = 'absolute';
             crosshair.style.top = '50%';
             crosshair.style.left = '50%';
-            crosshair.style.width = '8px';
-            crosshair.style.height = '8px';
-            crosshair.style.backgroundColor = '#00ffcc';
+            crosshair.style.width = '10px';
+            crosshair.style.height = '10px';
+            crosshair.style.border = '2px solid rgba(0, 255, 204, 0.8)';
             crosshair.style.borderRadius = '50%';
-            crosshair.style.transform = 'translate(-50%, -50%)';
+            crosshair.style.transform = 'translate(-50%, -50%) scale(1)';
             crosshair.style.pointerEvents = 'none';
-            crosshair.style.boxShadow = '0 0 4px #ffffff';
+            crosshair.style.transition = 'transform 0.1s ease, width 0.1s ease, height 0.1s ease';
             crosshair.style.zIndex = '100';
+
+            // Punto central de la mirilla
+            const dot = document.createElement('div');
+            dot.style.position = 'absolute';
+            dot.style.top = '50%';
+            dot.style.left = '50%';
+            dot.style.width = '2px';
+            dot.style.height = '2px';
+            dot.style.backgroundColor = '#ffffff';
+            dot.style.transform = 'translate(-50%, -50%)';
+            crosshair.appendChild(dot);
+
             container.style.position = 'relative';
             container.appendChild(crosshair);
         }
@@ -130,26 +142,19 @@ const Game = {
     createPlayerAvatar(classType, customColor) {
         const group = new THREE.Group();
 
-        // Cuerpo (Cilindro)
+        // En primera persona ocultamos la malla principal del jugador local para no bloquear la visión de los ojos,
+        // pero dejamos estructura lista si se requiere renderizar extremidades o armas a futuro.
         const bodyGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: customColor, roughness: 0.4 });
+        const bodyMat = new THREE.MeshStandardMaterial({ color: customColor, visible: false }); // Oculto en 1ra persona
         const body = new THREE.Mesh(bodyGeo, bodyMat);
         body.position.y = 0.3;
         group.add(body);
 
-        // Cabeza (Esfera)
         const headGeo = new THREE.SphereGeometry(0.12, 8, 8);
-        const headMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.3 });
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xffd700, visible: false });
         const head = new THREE.Mesh(headGeo, headMat);
         head.position.y = 0.7;
         group.add(head);
-
-        // Visor frontal (Indica hacia dónde apunta el mouse)
-        const faceGeo = new THREE.BoxGeometry(0.14, 0.06, 0.05);
-        const faceMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 });
-        const face = new THREE.Mesh(faceGeo, faceMat);
-        face.position.set(0, 0.7, 0.12);
-        group.add(face);
 
         return group;
     },
@@ -175,25 +180,38 @@ const Game = {
         if (this.localPlayer.mesh) {
             const p = this.localPlayer;
 
-            // --- LÓGICA DE MOVIMIENTO WASD (CORREGIDA PARA STRAFE LIMPIO) ---
+            // --- SIMULACIÓN DE ENFOQUE OCULAR EN LA MIRILLA ---
+            const crosshair = document.getElementById('game-crosshair');
+            let isMoving = false;
+
+            // --- MOVIMIENTO WASD / FLECHAS ---
             let moveForward = 0;
             let moveSide = 0;
 
-            if (this.keys['KeyW'] || this.keys['ArrowUp']) moveForward += p.speed;
-            if (this.keys['KeyS'] || this.keys['ArrowDown']) moveForward -= p.speed;
-            if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveSide -= p.speed;  // Strafe izquierda
-            if (this.keys['KeyD'] || this.keys['ArrowRight']) moveSide += p.speed; // Strafe derecha
+            if (this.keys['KeyW'] || this.keys['ArrowUp']) { moveForward += p.speed; isMoving = true; }
+            if (this.keys['KeyS'] || this.keys['ArrowDown']) { moveForward -= p.speed; isMoving = true; }
+            if (this.keys['KeyA'] || this.keys['ArrowLeft']) { moveSide -= p.speed; isMoving = true; }
+            if (this.keys['KeyD'] || this.keys['ArrowRight']) { moveSide += p.speed; isMoving = true; }
+
+            // Efecto visual en la mirilla: se expande al caminar (simulando enfoque/inestabilidad ocular) y se contrae al estar quieto
+            if (crosshair) {
+                if (isMoving) {
+                    crosshair.style.transform = 'translate(-50%, -50%) scale(1.4)';
+                    crosshair.style.borderColor = 'rgba(255, 100, 100, 0.9)';
+                } else {
+                    crosshair.style.transform = 'translate(-50%, -50%) scale(1)';
+                    crosshair.style.borderColor = 'rgba(0, 255, 204, 0.8)';
+                }
+            }
 
             if (moveForward !== 0 || moveSide !== 0) {
                 const R = this.planetRadius;
-                // Corrección matemática exacta de los senos y cosenos para el movimiento lateral sobre la esfera
                 const deltaTheta = (moveForward * Math.sin(p.heading) - moveSide * Math.cos(p.heading)) / R;
                 const deltaPhi   = (-moveForward * Math.cos(p.heading) - moveSide * Math.sin(p.heading)) / R;
 
                 p.theta += deltaTheta;
                 p.phi += deltaPhi;
 
-                // Limitar phi para no rebasar los polos
                 p.phi = Math.max(0.05, Math.min(Math.PI - 0.05, p.phi));
             }
 
@@ -205,7 +223,7 @@ const Game = {
 
             p.mesh.position.set(x, y, z);
 
-            // Orientación y alineación perfecta de la malla sobre la superficie curva
+            // Orientación de la malla
             const normal = p.mesh.position.clone().normalize();
             let tangent = new THREE.Vector3(-Math.cos(p.heading), 0, Math.sin(p.heading));
             tangent.addScaledVector(normal, -tangent.dot(normal)).normalize();
@@ -223,21 +241,19 @@ const Game = {
                 this.socket.emit('playerMove', { x, y, z });
             }
 
-            // --- CÁMARA TERCERA PERSONA (ÁNGULO 45° A ~5 METROS DETRÁS DE LA ESPALDA) ---
-            const distanceBack = 3.8;  
-            const heightUp = 2.5;      
+            // --- CÁMARA EN PRIMERA PERSONA (JUSTO EN LOS OJOS DEL PERSONAJE) ---
+            // Altura de los ojos sobre el centro del personaje (aproximadamente a la altura de la cabeza)
+            const eyeHeight = 0.75; 
+            const eyePosition = p.mesh.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
 
-            const backwardDir = new THREE.Vector3(-Math.sin(p.heading), 0, Math.cos(p.heading)).normalize();
-            backwardDir.addScaledVector(normal, -backwardDir.dot(normal)).normalize();
+            this.camera.position.copy(eyePosition);
 
-            const targetCamPos = p.mesh.position.clone()
-                .add(normal.clone().multiplyScalar(heightUp))
-                .add(backwardDir.multiplyScalar(distanceBack));
+            // Dirección hacia donde mira la cámara basada en el heading y el vector tangente del planeta
+            const lookDistance = 5.0;
+            const lookDirection = tangent.clone().multiplyScalar(lookDistance);
+            const targetLookAt = eyePosition.clone().add(lookDirection);
 
-            this.camera.position.lerp(targetCamPos, 0.2);
-
-            const lookTarget = p.mesh.position.clone().add(normal.clone().multiplyScalar(0.5));
-            this.camera.lookAt(lookTarget);
+            this.camera.lookAt(targetLookAt);
         }
 
         if (typeof WorldModule.rotatePlanet === 'function') {
