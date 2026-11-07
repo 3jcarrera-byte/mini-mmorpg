@@ -99,7 +99,6 @@ const Game = {
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.0025;
-                // Signos corregidos para evitar inversiones en los ejes
                 this.localPlayer.heading += e.movementX * sensitivity;
                 this.localPlayer.pitch += e.movementY * sensitivity;
                 this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
@@ -180,12 +179,17 @@ const Game = {
             const R = this.planetRadius;
             const normal = p.position.clone().normalize();
 
-            // --- CÁLCULO DE VECTORES BASADOS EN LA CÁMARA ---
-            // Construimos la orientación azimutal horizontal a partir del heading del mouse
-            const worldUp = Math.abs(normal.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+            // --- SISTEMA ANTIPOLOS ROBUSTO ---
+            // Si nos acercamos demasiado al polo norte o sur, cambiamos el vector de referencia auxiliar (worldUp)
+            let worldUp = new THREE.Vector3(0, 1, 0);
+            if (Math.abs(normal.dot(worldUp)) > 0.95) {
+                worldUp = new THREE.Vector3(0, 0, 1);
+            }
+
             const east = new THREE.Vector3().crossVectors(worldUp, normal).normalize();
             const north = new THREE.Vector3().crossVectors(normal, east).normalize();
 
+            // Dirección frontal estable proyectada limpiamente
             const forward = new THREE.Vector3()
                 .addScaledVector(north, Math.cos(p.heading))
                 .addScaledVector(east, Math.sin(p.heading))
@@ -193,7 +197,7 @@ const Game = {
 
             const right = new THREE.Vector3().crossVectors(normal, forward).normalize();
 
-            // --- MOVIMIENTO WASD ---
+            // --- MOVIMIENTO WASD LINEAL Y DIRECTO ---
             let moveForward = 0;
             let moveSide = 0;
 
@@ -217,6 +221,7 @@ const Game = {
                 moveDelta.addScaledVector(forward, moveForward);
                 moveDelta.addScaledVector(right, moveSide);
 
+                // Evitar efecto de "peladora de naranja" proyectando estrictamente en el plano tangente y renormalizando
                 p.position.add(moveDelta);
                 p.position.normalize().multiplyScalar(R);
             }
@@ -227,12 +232,11 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- POSICIÓN DE CÁMARA ESTABLE EN PRIMERA PERSONA ---
+            // --- CÁMARA PRIMERA PERSONA ---
             const eyeHeight = 0.75;
             const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
             this.camera.position.copy(eyePosition);
 
-            // Fijamos el vector Up de la cámara a la normal de la esfera para evitar inclinaciones ("oreja en el hombro")
             this.camera.up.copy(normal);
 
             const lookDir = forward.clone();
