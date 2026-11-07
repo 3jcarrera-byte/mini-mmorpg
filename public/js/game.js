@@ -23,12 +23,12 @@ const Game = {
     isGameRunning: false,
     planetRadius: 5.0,
     gravity: 0.004,
-    cameraMode: 'first', // 'first', 'third', 'rts'
+    cameraMode: 'third', // 'first', 'third', 'rts'
     isAiming: false,
     
-    // ESTADO DE MIRILLA
+    // Control de giro directo con el mouse
     crosshairOffset: { x: 0, y: 0 },
-    maxCrosshairRadius: 120,
+    maxCrosshairRadius: 40, // Reducido para evitar exceso de juego en el giro
 
     start(characterData) {
         if (characterData) {
@@ -97,7 +97,6 @@ const Game = {
         const hudName = document.getElementById('hud-char-name');
         if (hudName) hudName.innerText = `${this.localPlayer.name} (Lv.${this.localPlayer.level})`;
 
-        // --- CREAR MIRILLA PROFESIONAL DE SHOOTER ---
         this.createShooterCrosshair();
 
         // Eventos de teclado
@@ -122,12 +121,10 @@ const Game = {
 
         canvas.addEventListener('contextmenu', e => e.preventDefault());
         
-        // Activar Pointer Lock al hacer clic
         canvas.addEventListener('click', () => {
             canvas.requestPointerLock();
         });
 
-        // Control de Clic Derecho para Apuntar
         canvas.addEventListener('mousedown', e => {
             if (e.button === 2) { 
                 this.isAiming = true;
@@ -142,42 +139,23 @@ const Game = {
             }
         });
 
+        // --- MOVIMIENTO DEL MOUSE OPTIMIZADO PARA GIRO FLUIDO ---
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
-                const sensitivity = 0.0025;
+                const sensitivity = 0.003;
                 const normal = this.localPlayer.position.clone().normalize();
                 
-                if ((this.cameraMode === 'third' || this.cameraMode === 'rts') && !this.isAiming) {
-                    this.crosshairOffset.x += e.movementX;
-                    this.crosshairOffset.y += e.movementY;
+                // Rotación directa del personaje y su dirección al mover el mouse
+                const yawDelta = -e.movementX * sensitivity;
+                this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
+                this.localPlayer.forward.normalize();
 
-                    const dist = Math.hypot(this.crosshairOffset.x, this.crosshairOffset.y);
+                this.localPlayer.pitch -= e.movementY * sensitivity;
+                this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
 
-                    if (dist > this.maxCrosshairRadius) {
-                        const overflowX = (this.crosshairOffset.x / dist) * (dist - this.maxCrosshairRadius);
-                        const overflowY = (this.crosshairOffset.y / dist) * (dist - this.maxCrosshairRadius);
-
-                        const yawDelta = -overflowX * sensitivity;
-                        this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
-                        this.localPlayer.forward.normalize();
-
-                        this.localPlayer.pitch -= overflowY * sensitivity;
-                        this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
-
-                        this.crosshairOffset.x = (this.crosshairOffset.x / dist) * this.maxCrosshairRadius;
-                        this.crosshairOffset.y = (this.crosshairOffset.y / dist) * this.maxCrosshairRadius;
-                    }
-                } else {
-                    this.crosshairOffset.x = 0;
-                    this.crosshairOffset.y = 0;
-
-                    const yawDelta = -e.movementX * sensitivity;
-                    this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
-                    this.localPlayer.forward.normalize();
-
-                    this.localPlayer.pitch -= e.movementY * sensitivity;
-                    this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
-                }
+                // Restablecer ligero offset para evitar desvíos extraños en 3ª persona
+                this.crosshairOffset.x = 0;
+                this.crosshairOffset.y = 0;
             }
         });
     },
@@ -260,30 +238,37 @@ const Game = {
     handleBuildClick(e) {
         if (e.button === 0) {
             const depth = e.shiftKey ? -1 : 0;
-            // Opcional: Lógica de construcción conectada al mundo esférico
         }
     },
 
-    // --- DETECTOR DE COLISIONES CON OBSTÁCULOS Y ÁRBOLES EN EL MUNDO ---
+    // --- DETECTOR DE COLISIONES SÓLIDO ---
     checkCollision(nextPos, currentAltitude) {
-        if (typeof WorldModule === 'undefined' || !WorldModule.getObstacles) return false;
+        if (typeof WorldModule === 'undefined') return false;
         
-        const obstacles = WorldModule.getObstacles(); // Obtiene objetos colisionables del planeta
+        // Soporta tanto getObstacles como colliders internos del mundo esférico
+        let obstacles = [];
+        if (typeof WorldModule.getObstacles === 'function') {
+            obstacles = WorldModule.getObstacles();
+        } else if (WorldModule.colliders) {
+            obstacles = WorldModule.colliders;
+        }
+
         if (!obstacles || obstacles.length === 0) return false;
 
         const playerRadius = this.localPlayer.radius;
 
         for (let i = 0; i < obstacles.length; i++) {
             const obs = obstacles[i];
-            if (!obs.position) continue;
+            const obsPos = obs.position || obs; // Soporta objeto con .position o Vector3 directo
+            if (!obsPos) continue;
 
-            const dist = nextPos.distanceTo(obs.position);
-            const obstacleRadius = obs.radius || 0.6;
-            const obstacleHeight = obs.height || 1.2;
+            const dist = nextPos.distanceTo(obsPos);
+            const obstacleRadius = obs.radius || 0.5;
+            const obstacleHeight = obs.height || 1.0;
 
             if (dist < (playerRadius + obstacleRadius)) {
                 if (currentAltitude < obstacleHeight) {
-                    return true; // Colisión detectada (se bloquea el paso)
+                    return true; // Colisión detectada, bloquea el movimiento
                 }
             }
         }
@@ -305,7 +290,6 @@ const Game = {
             p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
             const right = new THREE.Vector3().crossVectors(p.forward, normal).normalize();
 
-            // --- CONTROLES WASD Y SALTO ---
             let moveForward = 0;
             let moveSide = 0;
 
@@ -326,17 +310,12 @@ const Game = {
                 p.verticalVelocity = 0;
             }
 
-            // --- VISIBILIDAD DE MIRILLA ---
             if (crosshair) {
                 crosshair.style.display = 'block';
-                
-                const scale = isMoving ? 'scale(1.3)' : 'scale(1)';
-                const posX = `calc(-50% + ${this.crosshairOffset.x}px)`;
-                const posY = `calc(-50% + ${this.crosshairOffset.y}px)`;
-                crosshair.style.transform = `translate(${posX}, ${posY}) ${scale}`;
+                const scale = isMoving ? 'scale(1.2)' : 'scale(1)';
+                crosshair.style.transform = `translate(-50%, -50%) ${scale}`;
             }
 
-            // --- SISTEMA DE MOVIMIENTO CON COMPROBACIÓN DE COLISIONES ---
             const targetPos = p.position.clone();
             const tempForward = p.forward.clone();
 
@@ -356,6 +335,7 @@ const Game = {
 
             targetPos.normalize().multiplyScalar(R + p.altitude);
 
+            // Validación de colisiones activa antes de actualizar posición
             if (!this.checkCollision(targetPos, p.altitude)) {
                 p.position.copy(targetPos);
                 p.forward.copy(tempForward);
@@ -374,7 +354,7 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS Y DIRECCIÓN ---
+            // --- GESTIÓN DE CÁMARAS CON RADIO Y ALCANCE PRECISOS ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
@@ -390,17 +370,13 @@ const Game = {
             } else if (this.cameraMode === 'third') {
                 let distanceBack = 3.5;
                 let heightUp = 1.6;
-                let rightOffset = 0.0;
 
                 if (this.isAiming) {
                     distanceBack = 2.0;
                     heightUp = 1.4;
-                    rightOffset = 0.6;
                 }
 
-                const shoulderOffset = right.clone().multiplyScalar(rightOffset);
                 const camPos = p.position.clone()
-                    .add(shoulderOffset)
                     .add(normal.clone().multiplyScalar(heightUp))
                     .sub(p.forward.clone().multiplyScalar(distanceBack));
                 
@@ -417,8 +393,8 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'rts') {
-                const rtsHeight = 3.75;
-                const rtsBack = 2.0;
+                const rtsHeight = 4.0;
+                const rtsBack = 2.5;
                 const camPos = p.position.clone()
                     .add(normal.clone().multiplyScalar(rtsHeight))
                     .sub(p.forward.clone().multiplyScalar(rtsBack));
