@@ -14,7 +14,8 @@ const Game = {
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
-        weaponRange: 15.0 
+        weaponRange: 15.0,
+        radius: 0.35 // Radio físico del jugador para colisiones
     },
     remotePlayers: {},
     keys: {},
@@ -24,9 +25,9 @@ const Game = {
     cameraMode: 'first', // 'first', 'third', 'rts'
     isAiming: false,
     
-    // --- ESTADO DE MIRILLA EN TERCERA PERSONA ---
+    // ESTADO DE MIRILLA
     crosshairOffset: { x: 0, y: 0 },
-    maxCrosshairRadius: 120, // Radio máximo en píxeles que la mira se aleja del centro
+    maxCrosshairRadius: 120,
 
     start(characterData) {
         if (characterData) {
@@ -111,7 +112,6 @@ const Game = {
                 } else {
                     this.cameraMode = 'first';
                 }
-                // Resetear offset de mirilla al cambiar de modo
                 this.crosshairOffset.x = 0;
                 this.crosshairOffset.y = 0;
             }
@@ -146,15 +146,12 @@ const Game = {
                 const sensitivity = 0.0025;
                 const normal = this.localPlayer.position.clone().normalize();
                 
-                if (this.cameraMode === 'third' && !this.isAiming) {
-                    // --- MOVIMIENTO LIBRE DE MIRILLA DENTRO DEL RADIO DE APUNTADO ---
+                if ((this.cameraMode === 'third' || this.cameraMode === 'rts') && !this.isAiming) {
                     this.crosshairOffset.x += e.movementX;
                     this.crosshairOffset.y += e.movementY;
 
-                    // Calcular la distancia desde el centro
                     const dist = Math.hypot(this.crosshairOffset.x, this.crosshairOffset.y);
 
-                    // Si supera el radio máximo, rotamos la orientación del jugador y limitamos el vector
                     if (dist > this.maxCrosshairRadius) {
                         const overflowX = (this.crosshairOffset.x / dist) * (dist - this.maxCrosshairRadius);
                         const overflowY = (this.crosshairOffset.y / dist) * (dist - this.maxCrosshairRadius);
@@ -166,12 +163,10 @@ const Game = {
                         this.localPlayer.pitch -= overflowY * sensitivity;
                         this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
 
-                        // Clampear desplazamiento al radio máximo
                         this.crosshairOffset.x = (this.crosshairOffset.x / dist) * this.maxCrosshairRadius;
                         this.crosshairOffset.y = (this.crosshairOffset.y / dist) * this.maxCrosshairRadius;
                     }
                 } else {
-                    // Control directo estándar en 1ª Persona o al mantener clic derecho en 3ª Persona
                     this.crosshairOffset.x = 0;
                     this.crosshairOffset.y = 0;
 
@@ -267,6 +262,35 @@ const Game = {
         }
     },
 
+    // --- DETECTOR DE COLISIONES CON OBSTÁCULOS Y ÁRBOLES EN EL MUNDO ---
+    checkCollision(nextPos, currentAltitude) {
+        if (typeof WorldModule === 'undefined' || !WorldModule.getObstacles) return false;
+        
+        const obstacles = WorldModule.getObstacles(); // Obtiene objetos colisionables del planeta
+        if (!obstacles || obstacles.length === 0) return false;
+
+        const playerRadius = this.localPlayer.radius;
+
+        for (let i = 0; i < obstacles.length; i++) {
+            const obs = obstacles[i];
+            if (!obs.position) continue;
+
+            // Distancia 3D desde la posición propuesta del jugador al objeto
+            const dist = nextPos.distanceTo(obs.position);
+            const obstacleRadius = obs.radius || 0.6;
+            const obstacleHeight = obs.height || 1.2;
+
+            // Si está dentro del radio horizontal de choque
+            if (dist < (playerRadius + obstacleRadius)) {
+                // Si la altitud del salto supera la altura del objeto, salta por encima limpiamente
+                if (currentAltitude < obstacleHeight) {
+                    return true; // Colisión detectada (se bloquea el paso)
+                }
+            }
+        }
+        return false;
+    },
+
     loop() {
         if (!this.isGameRunning) return;
         requestAnimationFrame(() => this.loop());
@@ -303,35 +327,43 @@ const Game = {
                 p.verticalVelocity = 0;
             }
 
-            // --- GESTIÓN DE MIRILLA (MISMA MIRA EN 1ª Y 3ª PERSONA) ---
+            // --- VISIBILIDAD DE MIRILLA EN TODAS LAS VISTAS (1ª, 3ª y RTS/Warcraft) ---
             if (crosshair) {
-                const showCrosshair = (this.cameraMode === 'first' || this.cameraMode === 'third');
-                crosshair.style.display = showCrosshair ? 'block' : 'none';
+                crosshair.style.display = 'block'; // Mirilla siempre presente en todos los modos
                 
-                if (showCrosshair) {
-                    const scale = isMoving ? 'scale(1.3)' : 'scale(1)';
-                    // En 3era persona aplica el offset dinámico del mouse dentro del radio
-                    const posX = `calc(-50% + ${this.crosshairOffset.x}px)`;
-                    const posY = `calc(-50% + ${this.crosshairOffset.y}px)`;
-                    crosshair.style.transform = `translate(${posX}, ${posY}) ${scale}`;
-                }
+                const scale = isMoving ? 'scale(1.3)' : 'scale(1)';
+                const posX = `calc(-50% + ${this.crosshairOffset.x}px)`;
+                const posY = `calc(-50% + ${this.crosshairOffset.y}px)`;
+                crosshair.style.transform = `translate(${posX}, ${posY}) ${scale}`;
             }
+
+            // --- SISTEMA DE MOVIMIENTO CON COMPROBACIÓN DE COLISIONES ---
+            const targetPos = p.position.clone();
+            const tempForward = p.forward.clone();
 
             if (moveForward !== 0) {
                 const axis = new THREE.Vector3().crossVectors(normal, p.forward).normalize();
                 const angle = moveForward / R;
-                p.position.applyAxisAngle(axis, angle);
-                p.forward.applyAxisAngle(axis, angle);
+                targetPos.applyAxisAngle(axis, angle);
+                tempForward.applyAxisAngle(axis, angle);
             }
 
             if (moveSide !== 0) {
                 const axis = new THREE.Vector3().crossVectors(normal, right).normalize();
                 const angle = moveSide / R;
-                p.position.applyAxisAngle(axis, angle);
-                p.forward.applyAxisAngle(axis, angle);
+                targetPos.applyAxisAngle(axis, angle);
+                tempForward.applyAxisAngle(axis, angle);
             }
 
-            p.position.normalize().multiplyScalar(R + p.altitude);
+            // Normalizar y ajustar a la altitud actual
+            targetPos.normalize().multiplyScalar(R + p.altitude);
+
+            // Verificar si el movimiento colisiona con obstáculos del mapa
+            if (!this.checkCollision(targetPos, p.altitude)) {
+                p.position.copy(targetPos);
+                p.forward.copy(tempForward);
+            }
+
             normal = p.position.clone().normalize();
             p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
 
@@ -388,6 +420,7 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'rts') {
+                // Vista cenital / RTS Warcraft 3
                 const rtsHeight = 3.75;
                 const rtsBack = 2.0;
                 const camPos = p.position.clone()
@@ -395,7 +428,12 @@ const Game = {
                     .sub(p.forward.clone().multiplyScalar(rtsBack));
 
                 this.camera.position.copy(camPos);
-                this.camera.lookAt(p.position);
+                
+                // Alineación con dirección de apuntado
+                const lookDir = p.forward.clone();
+                lookDir.applyAxisAngle(right, p.pitch);
+                const targetLookAt = p.position.clone().add(lookDir.multiplyScalar(2.0));
+                this.camera.lookAt(targetLookAt);
             }
         }
 
