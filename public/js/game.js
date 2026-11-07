@@ -1,6 +1,6 @@
 const Game = {
     socket: null, scene: null, camera: null, renderer: null,
-    localPlayer: { mesh: null, speed: 0.05, wood: 100, name: 'Héroe', level: 1 },
+    localPlayer: { mesh: null, speed: 0.05, wood: 100, name: 'Héroe', level: 1, classType: 'guerrero', color: 0xff0033 },
     remotePlayers: {},
     keys: {},
     isGameRunning: false,
@@ -9,9 +9,15 @@ const Game = {
         if (characterData) {
             this.localPlayer.name = characterData.name || 'Héroe';
             this.localPlayer.level = characterData.level || 1;
+            this.localPlayer.classType = characterData.classType || 'guerrero';
+            
+            // Asignar color según la clase o datos
+            if (characterData.classType === 'mago') this.localPlayer.color = 0x0088ff;
+            else if (characterData.classType === 'arquero') this.localPlayer.color = 0x00ff66;
+            else this.localPlayer.color = 0xff0033;
         }
 
-        // Cambio de pantalla seguro (comprobando si App existe o gestionándolo directamente)
+        // Cambio de pantalla seguro
         if (typeof App !== 'undefined' && typeof App.changeScreen === 'function') {
             App.changeScreen('screen-game');
         } else {
@@ -48,13 +54,16 @@ const Game = {
         sun.position.set(10, 20, 10);
         this.scene.add(sun);
 
-        // --- CREAR EL PLANETA ESFÉRICO USANDO EL MÓDULO ---
+        // --- CREAR EL PLANETA ESFÉRICO ---
         WorldModule.createPlanet(this.scene, { color: 0x1a4314, treeCount: 40, rockCount: 20 });
 
-        // Crear malla del jugador local (Avatar 3D)
-        const classType = (window.selectedCharacter && window.selectedCharacter.classType) || 'guerrero';
-        this.localPlayer.mesh = this.createPlayerAvatar(classType);
+        // Crear malla del jugador local con el avatar detallado y el color asignado
+        this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
         this.scene.add(this.localPlayer.mesh);
+
+        // Actualizar etiqueta del HUD con el nombre
+        const hudName = document.getElementById('hud-char-name');
+        if (hudName) hudName.innerText = `${this.localPlayer.name} (Lv.${this.localPlayer.level})`;
 
         // Eventos de teclado
         window.addEventListener('keydown', e => this.keys[e.code] = true);
@@ -64,23 +73,20 @@ const Game = {
         canvas.addEventListener('mousedown', e => this.handleBuildClick(e));
     },
 
-    createPlayerAvatar(classType) {
+    createPlayerAvatar(classType, customColor) {
         const group = new THREE.Group();
-        let color = 0xff0033;
-        if (classType === 'mago') color = 0x0088ff;
-        if (classType === 'arquero') color = 0x00ff66;
 
-        const body = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8), 
-            new THREE.MeshStandardMaterial({ color })
-        );
+        // Cuerpo (Cilindro)
+        const bodyGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: customColor, roughness: 0.4 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
         body.position.y = 0.3;
         group.add(body);
 
-        const head = new THREE.Mesh(
-            new THREE.SphereGeometry(0.12, 8, 8), 
-            new THREE.MeshStandardMaterial({ color: 0xffd700 })
-        );
+        // Cabeza (Esfera)
+        const headGeo = new THREE.SphereGeometry(0.12, 8, 8);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.3 });
+        const head = new THREE.Mesh(headGeo, headMat);
         head.position.y = 0.7;
         group.add(head);
 
@@ -100,7 +106,6 @@ const Game = {
         if (e.button === 0) {
             // Clic izquierdo: construir en superficie (depth: 0) o búnker subterráneo con Shift (depth: -1)
             const depth = e.shiftKey ? -1 : 0;
-            // Aquí puedes disparar la construcción usando las coordenadas actuales del jugador desde WorldModule
         }
     },
 
@@ -109,13 +114,28 @@ const Game = {
         requestAnimationFrame(() => this.loop());
 
         if (this.localPlayer.mesh) {
-            // Actualizar movimiento sobre la esfera usando el módulo externo
+            // Actualizar movimiento esférico desde el módulo de mundo
             const playerInfo = WorldModule.updatePlayerOnSphere(this.localPlayer.mesh, this.keys);
 
-            // Posicionar la cámara orbital detrás del jugador siguiendo la curvatura del planeta
-            const camOffset = playerInfo.position.clone().normalize().multiplyScalar(WorldModule.getRadius() + 3.5);
-            this.camera.position.copy(camOffset).add(new THREE.Vector3(0, 1.5, 0));
-            this.camera.lookAt(playerInfo.position);
+            // --- VISTA ISOMÉTRICA / TERCERA PERSONA ORIENTADA HACIA DONDE MIRA EL PERSONAJE ---
+            // Calculamos un vector de offset elevado y detrás del personaje respecto al centro del planeta
+            const playerPos = playerInfo.position;
+            const normal = playerPos.clone().normalize(); // Dirección hacia afuera desde el núcleo
+
+            // Posición de la cámara: Alejada en dirección normal (altura) y un poco hacia atrás
+            const camDistance = 4.5;
+            const camHeight = 2.5;
+
+            // Tomamos la posición del jugador y la desplazamos radialmente hacia afuera y alineada
+            const camTargetPos = playerPos.clone()
+                .add(normal.clone().multiplyScalar(camHeight))
+                .add(playerPos.clone().normalize().multiplyScalar(-camDistance));
+
+            // Suavizado de cámara (Lerp) para que el movimiento sea fluido estilo Diablo/Rust
+            this.camera.position.lerp(camTargetPos, 0.15);
+            
+            // La cámara siempre apunta ligeramente por delante o directamente al personaje
+            this.camera.lookAt(playerPos);
         }
 
         WorldModule.rotatePlanet();
