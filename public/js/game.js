@@ -82,11 +82,49 @@ const Game = {
         const hudName = document.getElementById('hud-char-name');
         if (hudName) hudName.innerText = `${this.localPlayer.name} (Lv.${this.localPlayer.level})`;
 
+        // --- CREAR MIRILLA (CROSSHAIR) EN EL HUD ---
+        this.createCrosshair();
+
+        // Eventos de teclado
         window.addEventListener('keydown', e => this.keys[e.code] = true);
         window.addEventListener('keyup', e => this.keys[e.code] = false);
 
         canvas.addEventListener('contextmenu', e => e.preventDefault());
+        
+        // Activar Pointer Lock al hacer clic en el canvas para controlar la cámara con el mouse estilo shooter
+        canvas.addEventListener('click', () => {
+            canvas.requestPointerLock();
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (document.pointerLockElement === canvas) {
+                const sensitivity = 0.003;
+                this.localPlayer.heading -= e.movementX * sensitivity;
+            }
+        });
+
         canvas.addEventListener('mousedown', e => this.handleBuildClick(e));
+    },
+
+    createCrosshair() {
+        const container = document.querySelector('.game-container');
+        if (container && !document.getElementById('game-crosshair')) {
+            const crosshair = document.createElement('div');
+            crosshair.id = 'game-crosshair';
+            crosshair.style.position = 'absolute';
+            crosshair.style.top = '50%';
+            crosshair.style.left = '50%';
+            crosshair.style.width = '8px';
+            crosshair.style.height = '8px';
+            crosshair.style.backgroundColor = '#00ffcc';
+            crosshair.style.borderRadius = '50%';
+            crosshair.style.transform = 'translate(-50%, -50%)';
+            crosshair.style.pointerEvents = 'none';
+            crosshair.style.boxShadow = '0 0 4px #ffffff';
+            crosshair.style.zIndex = '100';
+            container.style.position = 'relative';
+            container.appendChild(crosshair);
+        }
     },
 
     createPlayerAvatar(classType, customColor) {
@@ -106,7 +144,7 @@ const Game = {
         head.position.y = 0.7;
         group.add(head);
 
-        // Visor frontal (Indica hacia dónde mira)
+        // Visor frontal (Indica hacia dónde apunta el mouse)
         const faceGeo = new THREE.BoxGeometry(0.14, 0.06, 0.05);
         const faceMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 });
         const face = new THREE.Mesh(faceGeo, faceMat);
@@ -136,31 +174,30 @@ const Game = {
 
         if (this.localPlayer.mesh) {
             const p = this.localPlayer;
-            const turnSpeed = 0.05;
 
-            // Giro libre de 360° con flechas izquierda/derecha o A/D para girar la vista
-            if (this.keys['ArrowLeft'] || this.keys['KeyA']) p.heading += turnSpeed;
-            if (this.keys['ArrowRight'] || this.keys['KeyD']) p.heading -= turnSpeed;
+            // --- LÓGICA DE MOVIMIENTO WASD (DESPLAZAMIENTO PURO) ---
+            let moveForward = 0;
+            let moveSide = 0;
 
-            // Movimiento hacia adelante (W) y hacia atrás (S) basado en la dirección a la que apunta el visor
-            let moveDir = 0;
-            if (this.keys['KeyW'] || this.keys['ArrowUp']) moveDir += p.speed;
-            if (this.keys['KeyS'] || this.keys['ArrowDown']) moveDir -= p.speed;
+            if (this.keys['KeyW'] || this.keys['ArrowUp']) moveForward += p.speed;
+            if (this.keys['KeyS'] || this.keys['ArrowDown']) moveForward -= p.speed;
+            if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveSide -= p.speed;  // Strafe izquierda
+            if (this.keys['KeyD'] || this.keys['ArrowRight']) moveSide += p.speed; // Strafe derecha
 
-            if (moveDir !== 0) {
+            if (moveForward !== 0 || moveSide !== 0) {
                 const R = this.planetRadius;
-                // Desplazamiento esférico alineado con el heading actual del personaje
-                const deltaTheta = (moveDir * Math.sin(p.heading)) / R;
-                const deltaPhi   = (-moveDir * Math.cos(p.heading)) / R;
+                // Cálculo vectorial de movimiento sobre la superficie esférica basado en la dirección del mouse (heading)
+                const deltaTheta = (moveForward * Math.sin(p.heading) + moveSide * Math.cos(p.heading)) / R;
+                const deltaPhi   = (-moveForward * Math.cos(p.heading) + moveSide * Math.sin(p.heading)) / R;
 
                 p.theta += deltaTheta;
                 p.phi += deltaPhi;
 
-                // Limitar phi para no voltear el mundo en los polos
+                // Limitar phi para no rebasar los polos
                 p.phi = Math.max(0.05, Math.min(Math.PI - 0.05, p.phi));
             }
 
-            // Calcular posición cartesiana 3D del personaje sobre la esfera
+            // Posición cartesiana 3D del personaje sobre la esfera
             const R = this.planetRadius;
             const x = R * Math.sin(p.phi) * Math.sin(p.theta);
             const y = R * Math.cos(p.phi);
@@ -168,7 +205,7 @@ const Game = {
 
             p.mesh.position.set(x, y, z);
 
-            // Orientación y alineación perfecta de la malla sobre la superficie curva del planeta
+            // Orientación y alineación perfecta de la malla sobre la superficie curva
             const normal = p.mesh.position.clone().normalize();
             let tangent = new THREE.Vector3(-Math.cos(p.heading), 0, Math.sin(p.heading));
             tangent.addScaledVector(normal, -tangent.dot(normal)).normalize();
@@ -182,27 +219,23 @@ const Game = {
             const rotMatrix = new THREE.Matrix4().makeBasis(binormal, normal, tangent);
             p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
 
-            if (moveDir !== 0 && this.socket) {
+            if ((moveForward !== 0 || moveSide !== 0) && this.socket) {
                 this.socket.emit('playerMove', { x, y, z });
             }
 
             // --- CÁMARA TERCERA PERSONA (ÁNGULO 45° A ~5 METROS DETRÁS DE LA ESPALDA) ---
-            const distanceBack = 3.8;  // Distancia aproximada hacia atrás
-            const heightUp = 2.5;      // Altura para lograr el ángulo de ~45 grados
+            const distanceBack = 3.8;  
+            const heightUp = 2.5;      
 
-            // Vector dirección hacia atrás basado en el heading del personaje
             const backwardDir = new THREE.Vector3(-Math.sin(p.heading), 0, Math.cos(p.heading)).normalize();
             backwardDir.addScaledVector(normal, -backwardDir.dot(normal)).normalize();
 
-            // Posición ideal de la cámara
             const targetCamPos = p.mesh.position.clone()
                 .add(normal.clone().multiplyScalar(heightUp))
                 .add(backwardDir.multiplyScalar(distanceBack));
 
-            // Suavizado fluido de la cámara al seguir al personaje
             this.camera.position.lerp(targetCamPos, 0.2);
 
-            // La cámara apunta hacia el personaje (llevando la mirada un poco más arriba de sus pies)
             const lookTarget = p.mesh.position.clone().add(normal.clone().multiplyScalar(0.5));
             this.camera.lookAt(lookTarget);
         }
