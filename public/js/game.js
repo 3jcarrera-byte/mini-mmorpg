@@ -9,6 +9,7 @@ const Game = {
         classType: 'guerrero', 
         color: 0xff0033,
         position: new THREE.Vector3(0, 5.0, 0),
+        quaternion: new THREE.Quaternion(), // Orientación 3D exacta sobre la esfera
         heading: 0, 
         pitch: 0 
     },
@@ -70,8 +71,9 @@ const Game = {
             this.planetRadius = WorldModule.getRadius();
         }
 
-        // Posición inicial en la parte superior del planeta
+        // Posición inicial sobre el planeta
         this.localPlayer.position.set(0, this.planetRadius, 0);
+        this.localPlayer.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 1, 0));
         this.localPlayer.heading = 0;
         this.localPlayer.pitch = 0;
 
@@ -179,21 +181,19 @@ const Game = {
             const R = this.planetRadius;
             const normal = p.position.clone().normalize();
 
-            // --- CÁLCULO VECTORIAL LIBRE DE SINGULARIDADES (MATEMÁTICA PURA SOBRE LA ESFERA) ---
-            // Tomamos un vector de referencia seguro que nunca será paralelo absoluto en toda la esfera
-            let safeRef = Math.abs(normal.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-            const tangentX = new THREE.Vector3().crossVectors(normal, safeRef).normalize();
-            const tangentZ = new THREE.Vector3().crossVectors(normal, tangentX).normalize();
+            // --- SISTEMA DE NAVEGACIÓN BASADO EN MATRIZ DE ORIENTACIÓN LOCAL ---
+            // Orientamos el objeto avatar según la normal del planeta
+            const upVector = new THREE.Vector3(0, 1, 0);
+            const alignQuat = new THREE.Quaternion().setFromUnitVectors(upVector, normal);
+            
+            // Vector frontal en el plano horizontal según el giro del mouse (heading)
+            const forwardLocal = new THREE.Vector3(Math.sin(p.heading), 0, Math.cos(p.heading));
+            forwardLocal.applyQuaternion(alignQuat);
+            forwardLocal.addScaledVector(normal, -forwardLocal.dot(normal)).normalize();
 
-            // Dirección frontal alineada estrictamente con el heading del mouse en el plano tangente
-            const forward = new THREE.Vector3()
-                .addScaledVector(tangentX, Math.sin(p.heading))
-                .addScaledVector(tangentZ, Math.cos(p.heading))
-                .normalize();
+            const rightLocal = new THREE.Vector3().crossVectors(normal, forwardLocal).normalize();
 
-            const right = new THREE.Vector3().crossVectors(normal, forward).normalize();
-
-            // --- MOVIMIENTO WASD ---
+            // --- CONTROLES WASD ---
             let moveForward = 0;
             let moveSide = 0;
 
@@ -213,12 +213,18 @@ const Game = {
             }
 
             if (moveForward !== 0 || moveSide !== 0) {
-                const moveDelta = new THREE.Vector3();
-                moveDelta.addScaledVector(forward, moveForward);
-                moveDelta.addScaledVector(right, moveSide);
+                // Generar vector de velocidad pura
+                const moveDirection = new THREE.Vector3();
+                moveDirection.addScaledVector(forwardLocal, moveForward);
+                moveDirection.addScaledVector(rightLocal, moveSide);
 
-                // Desplazamiento limpio proyectado en la esfera sin bloqueos ni paredes invisibles
-                p.position.add(moveDelta);
+                // Calcular eje de rotación esférica (perpendicular al movimiento y a la normal)
+                const rotationAxis = new THREE.Vector3().crossVectors(normal, moveDirection).normalize();
+                const angle = moveDirection.length() / R;
+
+                // Aplicar rotación sobre el centro del planeta
+                const stepQuat = new THREE.Quaternion().setFromAxisAngle(rotationAxis, angle);
+                p.position.applyQuaternion(stepQuat);
                 p.position.normalize().multiplyScalar(R);
             }
 
@@ -228,16 +234,25 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- CÁMARA PRIMERA PERSONA ESTABLE ---
+            // --- CÁMARA EN PRIMERA PERSONA ESTABLE ---
+            const newNormal = p.position.clone().normalize();
             const eyeHeight = 0.75;
-            const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
+            const eyePosition = p.position.clone().add(newNormal.clone().multiplyScalar(eyeHeight));
             this.camera.position.copy(eyePosition);
 
-            // Gravedad local de la cámara limpia
-            this.camera.up.copy(normal);
+            this.camera.up.copy(newNormal);
 
-            const lookDir = forward.clone();
-            lookDir.applyAxisAngle(right, p.pitch);
+            // Re-calcular vector de vista con la nueva normal
+            const newAlignQuat = new THREE.Quaternion().setFromUnitVectors(upVector, newNormal);
+            const newForward = new THREE.Vector3(Math.sin(p.heading), 0, Math.cos(p.heading));
+            newForward.applyQuaternion(newAlignQuat);
+            newForward.addScaledVector(newNormal, -newForward.dot(newNormal)).normalize();
+
+            const newRight = new THREE.Vector3().crossVectors(newNormal, newForward).normalize();
+
+            // Aplicar inclinación vertical (pitch)
+            const lookDir = newForward.clone();
+            lookDir.applyAxisAngle(newRight, p.pitch);
 
             const targetLookAt = eyePosition.clone().add(lookDir.multiplyScalar(5.0));
             this.camera.lookAt(targetLookAt);
