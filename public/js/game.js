@@ -10,7 +10,19 @@ const Game = {
             this.localPlayer.name = characterData.name || 'Héroe';
             this.localPlayer.level = characterData.level || 1;
         }
-        App.changeScreen('screen-game');
+
+        // Cambio de pantalla seguro (comprobando si App existe o gestionándolo directamente)
+        if (typeof App !== 'undefined' && typeof App.changeScreen === 'function') {
+            App.changeScreen('screen-game');
+        } else {
+            const loginScreen = document.getElementById('screen-login');
+            const charScreen = document.getElementById('screen-character');
+            const gameScreen = document.getElementById('screen-game');
+            if (loginScreen) loginScreen.classList.remove('active');
+            if (charScreen) charScreen.classList.remove('active');
+            if (gameScreen) gameScreen.classList.add('active');
+        }
+
         this.initEngine();
         this.connectServer();
         this.isGameRunning = true;
@@ -86,7 +98,7 @@ const Game = {
 
     handleBuildClick(e) {
         if (e.button === 0) {
-            // Clic izquierdo: construir en superficie o búnker subterráneo (Shift)
+            // Clic izquierdo: construir en superficie (depth: 0) o búnker subterráneo con Shift (depth: -1)
             const depth = e.shiftKey ? -1 : 0;
             // Aquí puedes disparar la construcción usando las coordenadas actuales del jugador desde WorldModule
         }
