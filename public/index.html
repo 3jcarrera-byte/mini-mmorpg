@@ -46,42 +46,38 @@
         </div>
     </div>
 
-    <!-- 4. PANTALLA SELECCIÓN / CREACIÓN (CINEMÁTICA 3D) -->
+    <!-- 4. PANTALLA SELECCIÓN / CREACIÓN (CINEMÁTICA 3D ESTILO MU / DIABLO) -->
     <div id="screen-character" class="screen full-cinematic">
         <canvas id="characterCanvas" class="cinematic-canvas"></canvas>
 
         <div id="panel-top-name" class="panel-top-name">
-            <h2 id="char-display-name">SELECCIONA TU HÉROE</h2>
+            <h2 id="char-display-name" style="margin: 0; font-size: 16px;">CLASE: GUERRERO</h2>
         </div>
 
-        <!-- Panel Izquierdo: Lista de Personajes -->
-        <div id="panel-characters" class="panel-left-actions">
-            <h3>MIS HÉROES</h3>
-            <div id="character-list" style="flex: 1; overflow-y: auto;"></div>
-            <button id="btn-to-create" class="btn-large">+ NUEVO HÉROE</button>
-            <button id="btn-logout" class="btn-secondary">SALIR</button>
-        </div>
-
-        <!-- Flechas de Selección 3D (Solo en modo creación) -->
+        <!-- Flechas de Selección 3D de Clase (Solo en modo creación) -->
         <button id="btn-arrow-left" class="btn-arrow arrow-left">&lt;</button>
         <button id="btn-arrow-right" class="btn-arrow arrow-right">&gt;</button>
 
-        <!-- Panel Inferior: Datos para Creación -->
-        <div id="panel-create-controls" class="panel-bottom" style="display: none;">
-            <input type="text" id="create-char-name" placeholder="Nombre del Personaje" maxlength="16">
-            <div style="display: flex; gap: 10px;">
-                <button id="btn-confirm-create" class="btn-large">CREAR PERSONAJE</button>
-                <button id="btn-cancel-create" class="btn-secondary" style="width: 40%;">CANCELAR</button>
-            </div>
-        </div>
+        <!-- Panel Central Inferior (Estilo Mu Online) -->
+        <div class="mu-select-panel">
+            <h3 style="font-size: 14px; margin-bottom: 8px;">SELECCIONA TU HÉROE</h3>
+            
+            <!-- Fila de Héroes Existentes -->
+            <div id="character-list" class="character-row"></div>
 
-        <!-- Panel Derecho: Entrar al Juego -->
-        <div id="panel-enter-game" class="panel-right">
-            <h3>DETALLES</h3>
-            <div id="char-stats-info" style="font-size: 12px; color: #ccc; margin-bottom: 15px;">
-                Selecciona un personaje de la lista para ver sus atributos.
+            <!-- Botón de Nuevo Héroe (Debajo de los personajes) -->
+            <button id="btn-to-create" class="btn-secondary">+ NUEVO HÉROE</button>
+            <button id="btn-play" class="btn-large" style="display: none; background: #8b0000; border-color: #ffd700;">ENTRAR AL MUNDO</button>
+            <button id="btn-logout" class="btn-secondary" style="font-size: 11px; padding: 6px;">CERRAR SESIÓN</button>
+
+            <!-- Controles de Creación de Personaje (Ocultos hasta pulsar Nuevo Héroe) -->
+            <div id="panel-create-controls" class="creation-controls">
+                <input type="text" id="create-char-name" placeholder="Nombre del Héroe" maxlength="15">
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <button id="btn-confirm-create" class="btn-large" style="background: #114411;">CREAR</button>
+                    <button id="btn-cancel-create" class="btn-secondary" style="width: 40%; margin: 6px 0;">CANCELAR</button>
+                </div>
             </div>
-            <button id="btn-play" class="btn-large" style="display: none;">ENTRAR AL MUNDO</button>
         </div>
     </div>
 
@@ -89,8 +85,11 @@
     <div id="screen-game" class="screen">
         <div class="game-container">
             <canvas id="mapCanvas" width="800" height="600"></canvas>
-            <div class="hud">
-                <span id="hud-char-name"></span> | HP: <span id="hud-hp">100/100</span> | MUNDO MULTIJUGADOR
+            <div class="hud" style="display: flex; justify-content: space-between; align-items: center; width: 800px;">
+                <div>
+                    <span id="hud-char-name"></span> | HP: <span id="hud-hp">100/100</span>
+                </div>
+                <button id="btn-return-menu" class="btn-secondary" style="width: auto; padding: 4px 12px; margin: 0; font-size: 11px;">SALIR AL MENÚ</button>
             </div>
         </div>
     </div>
