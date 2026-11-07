@@ -43,10 +43,10 @@ const CharacterModule = (() => {
         floor.position.y = -0.1;
         scene.add(floor);
 
-        // Modelos de selección de clase en Modo Creación
+        // Modelos de selección de clase en Modo Creación (Elevados en Y para que no choquen con el panel)
         classes.forEach((c, idx) => {
             const group = createCharacterMesh(c.color, `${c.name.toUpperCase()}`);
-            group.position.set((idx - 1) * 2, 0, 0);
+            group.position.set((idx - 1) * 2, 0.4, 0); // Elevados ligeramente en Y
             group.visible = false;
             scene.add(group);
             classCreationMeshes[c.id] = group;
@@ -57,11 +57,11 @@ const CharacterModule = (() => {
         animate();
     }
 
-    // Constructor de malla 3D con texto flotante LIMPIO (Sin recuadro negro)
+    // Constructor de malla 3D con texto flotante limpio
     function createCharacterMesh(colorHex, labelText) {
         const group = new THREE.Group();
         
-        // Cuerpo (Cilindro centrado en x=0, z=0 exactos sobre el texto)
+        // Cuerpo
         const bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 16);
         const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
         const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -75,31 +75,27 @@ const CharacterModule = (() => {
         head.position.y = 1.4;
         group.add(head);
 
-        // Etiqueta 3D Flotante Transparente (SIN fondo negro)
+        // Etiqueta 3D Flotante Transparente
         const labelSprite = createTransparentTextSprite(labelText);
-        labelSprite.position.set(0, 1.9, 0); // Justo arriba de la cabeza
+        labelSprite.position.set(0, 1.9, 0);
         group.add(labelSprite);
 
         return group;
     }
 
-    // Generador de Textura de Texto 100% Transparente (Elimina el recuadro negro)
     function createTransparentTextSprite(text) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = 512;
         canvas.height = 128;
         
-        // Sin fondo (transparente por defecto)
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Estilo de texto nítido estilo MMORPG
         ctx.font = 'bold 36px "Courier New", monospace';
-        ctx.fillStyle = '#ffd700'; // Dorado brillante
+        ctx.fillStyle = '#ffd700';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
-        // Sombra suave para legibilidad sin recuadros
         ctx.shadowColor = '#000000';
         ctx.shadowBlur = 8;
         ctx.fillText(text, canvas.width / 2, canvas.height / 2);
@@ -127,14 +123,13 @@ const CharacterModule = (() => {
 
             const meshGroup = createCharacterMesh(classColor, `${char.name} (Lv.${char.level || 1})`);
             meshGroup.position.set(posX, 0, 0);
-            meshGroup.userData = char; // Asociar los datos reales del personaje a la figura 3D
+            meshGroup.userData = char; 
 
             scene.add(meshGroup);
             characterMeshes.push(meshGroup);
         });
     }
 
-    // Selección por Clic Directo en la figura 3D (Raycaster)
     function onCanvasClick(event) {
         if (isCreationMode) return;
 
@@ -156,7 +151,6 @@ const CharacterModule = (() => {
                 selectedCharacterData = target.userData;
                 highlightSelectedMesh(target);
 
-                // Notificar a app.js que este personaje 3D fue seleccionado
                 if (window.onCharacter3DSelected) {
                     window.onCharacter3DSelected(selectedCharacterData);
                 }
@@ -167,13 +161,11 @@ const CharacterModule = (() => {
     function highlightSelectedMesh(selectedGroup) {
         characterMeshes.forEach(group => {
             group.scale.set(1, 1, 1);
-            // Restablecer brillo de materiales
             group.traverse(child => {
                 if (child.material && child.material.emissive) child.material.emissive.setHex(0x000000);
             });
         });
 
-        // Destacar visualmente el personaje seleccionado
         selectedGroup.scale.set(1.15, 1.15, 1.15);
         selectedGroup.traverse(child => {
             if (child.material && child.material.emissive) child.material.emissive.setHex(0x332200);
@@ -196,7 +188,13 @@ const CharacterModule = (() => {
         if (arrowLeft) arrowLeft.style.display = active ? 'block' : 'none';
         if (arrowRight) arrowRight.style.display = active ? 'block' : 'none';
 
-        if (active) focusClass(0);
+        // Ajustar altura de cámara según el modo para dar aire al menú inferior
+        if (active) {
+            camera.position.set(0, 2.2, 4.5); // Ligeramente más arriba y cerca en creación
+            focusClass(0);
+        } else {
+            camera.position.set(0, 1.8, 5.0); // Posición estándar para selección
+        }
     }
 
     function animate() {
