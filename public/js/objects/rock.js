@@ -13,8 +13,8 @@ const RockObject = {
             mesh: mesh,
             collider: {
                 position: mesh.position.clone(),
-                radius: 0.2,
-                height: 0.3
+                radius: 0.1,
+                height: 0.2
             },
             resourceType: 'stone',
             resourceAmount: 15
