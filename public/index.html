@@ -80,7 +80,7 @@
 
             <!-- Controles de Creación de Personaje (Ocultos hasta pulsar Nuevo Héroe) -->
             <div id="panel-create-controls" class="creation-controls">
-                <input type="text" id="create-char-name" placeholder="Nombre del Héroe" maxlength="15">
+                <input type="text" id="create-char-name" placeholder="Nombre del Héroe" maxlength="15" autocapitalize="off" spellcheck="false">
                 <div style="display: flex; gap: 8px; width: 100%;">
                     <button id="btn-confirm-create" class="btn-large" style="background: #114411;">CREAR</button>
                     <button id="btn-cancel-create" class="btn-secondary" style="width: 40%; margin: 6px 0;">CANCELAR</button>
@@ -108,7 +108,7 @@
             <canvas id="mapCanvas" width="800" height="600"></canvas>
             <div class="hud" style="display: flex; justify-content: space-between; align-items: center; width: 800px;">
                 <div>
-                    <span id="hud-char-name"></span> | HP: <span id="hud-hp">100/100</span>
+                    <span id="hud-char-name"></span> | HP: <span id="hud-hp">100/100</span> | Madera: <span id="ui-wood">100</span> | Modo: <span id="ui-build">WOOD</span>
                 </div>
                 <button id="btn-return-menu" class="btn-secondary" style="width: auto; padding: 4px 12px; margin: 0; font-size: 11px;">SALIR AL MENÚ</button>
             </div>
@@ -116,6 +116,7 @@
     </div>
 
     <script src="js/character.js"></script>
+    <script src="js/world.js"></script>
     <script src="js/game.js"></script>
     <script src="js/app.js"></script>
 </body>
