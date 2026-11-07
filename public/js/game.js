@@ -3,9 +3,9 @@ const Game = {
     localPlayer: { 
         mesh: null, 
         speed: 0.05, 
-        jumpSpeed: 0.08,    // Velocidad inicial de salto hacia arriba
-        verticalVelocity: 0, // Inercia vertical actual
-        altitude: 0,         // Altura sobre la superficie de la esfera
+        jumpSpeed: 0.08,    
+        verticalVelocity: 0, 
+        altitude: 0,         
         wood: 100, 
         name: 'Héroe', 
         level: 1, 
@@ -19,7 +19,7 @@ const Game = {
     keys: {},
     isGameRunning: false,
     planetRadius: 5.0,
-    gravity: 0.004, // Gravedad constante que atrae al jugador al suelo
+    gravity: 0.004,
 
     start(characterData) {
         if (characterData) {
@@ -112,8 +112,8 @@ const Game = {
                 this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
                 this.localPlayer.forward.normalize();
 
-                // Pitch (Inclinación vertical)
-                this.localPlayer.pitch += e.movementY * sensitivity;
+                // Pitch (Inclinación vertical corregida / invertida)
+                this.localPlayer.pitch -= e.movementY * sensitivity;
                 this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
             }
         });
@@ -192,13 +192,10 @@ const Game = {
             const R = this.planetRadius;
             let normal = p.position.clone().normalize();
 
-            // Asegurar que forward sea estrictamente tangente
             p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
-            
-            // Invertido el signo de right para corregir la dirección de izquierda y derecha
             const right = new THREE.Vector3().crossVectors(p.forward, normal).normalize();
 
-            // --- CONTROLES WASD Y SALTO (BARRA ESPACIADORA) ---
+            // --- CONTROLES WASD Y SALTO ---
             let moveForward = 0;
             let moveSide = 0;
 
@@ -207,12 +204,10 @@ const Game = {
             if (this.keys['KeyA'] || this.keys['ArrowLeft']) { moveSide -= p.speed; isMoving = true; }
             if (this.keys['KeyD'] || this.keys['ArrowRight']) { moveSide += p.speed; isMoving = true; }
 
-            // Lógica de Salto (Barra espaciadora)
             if (this.keys['Space'] && p.altitude <= 0.001) {
                 p.verticalVelocity = p.jumpSpeed;
             }
 
-            // Aplicar física de gravedad y salto en el eje vertical local
             p.verticalVelocity -= this.gravity;
             p.altitude += p.verticalVelocity;
 
@@ -231,7 +226,6 @@ const Game = {
                 }
             }
 
-            // Desplazamiento sobre la superficie esférica
             if (moveForward !== 0) {
                 const axis = new THREE.Vector3().crossVectors(normal, p.forward).normalize();
                 const angle = moveForward / R;
@@ -246,7 +240,6 @@ const Game = {
                 p.forward.applyAxisAngle(axis, angle);
             }
 
-            // Posición final considerando la altitud del salto sobre el radio del planeta
             p.position.normalize().multiplyScalar(R + p.altitude);
             normal = p.position.clone().normalize();
             p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
