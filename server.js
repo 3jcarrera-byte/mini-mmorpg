@@ -25,8 +25,13 @@ const charactersDB = {
 io.on('connection', (socket) => {
     let currentUser = null;
 
-    // Login
-    socket.on('auth:login', ({ username }, callback) => {
+    // Login (Validando credenciales)
+    socket.on('auth:login', ({ username, password }, callback) => {
+        const userRecord = usersDB[username];
+        if (!userRecord || userRecord.password !== password) {
+            return callback({ success: false, message: 'Usuario o contraseña incorrectos.' });
+        }
+
         currentUser = username;
         if (!charactersDB[username]) charactersDB[username] = [];
         callback({ success: true, characters: charactersDB[username] });
@@ -48,6 +53,28 @@ io.on('connection', (socket) => {
 
         const newChar = { id: Date.now(), name, classType, level: 1, hp: 100 };
         charactersDB[currentUser].push(newChar);
+
+        callback({ success: true, characters: charactersDB[currentUser] });
+    });
+
+    // Eliminar Personaje
+    socket.on('character:delete', ({ characterId }, callback) => {
+        if (!currentUser) return callback({ success: false, message: 'No autenticado.' });
+
+        if (!charactersDB[currentUser]) {
+            return callback({ success: false, message: 'No se encontraron personajes.' });
+        }
+
+        const initialLength = charactersDB[currentUser].length;
+        // Filtrar eliminando el personaje que coincida por id o _id (soporta formato numérico o string)
+        charactersDB[currentUser] = charactersDB[currentUser].filter(c => 
+            c.id.toString() !== characterId.toString() && 
+            (c._id ? c._id.toString() !== characterId.toString() : true)
+        );
+
+        if (charactersDB[currentUser].length === initialLength) {
+            return callback({ success: false, message: 'Personaje no encontrado.' });
+        }
 
         callback({ success: true, characters: charactersDB[currentUser] });
     });
