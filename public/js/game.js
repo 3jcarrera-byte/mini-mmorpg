@@ -8,8 +8,7 @@ const Game = {
         level: 1, 
         classType: 'guerrero', 
         color: 0xff0033,
-        theta: 0, 
-        phi: Math.PI / 2, 
+        position: new THREE.Vector3(0, 5.0, 0), // Posición 3D exacta en el mundo
         heading: 0,   // Yaw (Rotación horizontal)
         pitch: 0      // Pitch (Inclinación vertical)
     },
@@ -71,9 +70,8 @@ const Game = {
             this.planetRadius = WorldModule.getRadius();
         }
 
-        // Posición inicial sobre la esfera
-        this.localPlayer.theta = 0;
-        this.localPlayer.phi = 0.3;
+        // Posición inicial en la parte superior del planeta
+        this.localPlayer.position.set(0, this.planetRadius, 0);
         this.localPlayer.heading = 0;
         this.localPlayer.pitch = 0;
 
@@ -103,7 +101,7 @@ const Game = {
                 const sensitivity = 0.0025;
                 // Yaw: Giro horizontal de la mirada
                 this.localPlayer.heading -= e.movementX * sensitivity;
-                // Pitch: Inclinación vertical (ver suelo y cielo libremente)
+                // Pitch: Inclinación vertical corregida (mirar arriba y abajo de forma natural)
                 this.localPlayer.pitch -= e.movementY * sensitivity;
                 this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
             }
@@ -180,28 +178,24 @@ const Game = {
             const crosshair = document.getElementById('game-crosshair');
             let isMoving = false;
 
-            // --- CÁLCULO DE VECTORES TANGENCIALES SOBRE LA ESFERA ---
-            // Primero calculamos la posición actual provisional para obtener la normal al planeta
-            const R = this.planetRadius;
-            const currentX = R * Math.sin(p.phi) * Math.sin(p.theta);
-            const currentY = R * Math.cos(p.phi);
-            const currentZ = R * Math.sin(p.phi) * Math.cos(p.theta);
+            // --- NORMAL Y BASE TANGENCIAL ESTABLE EN LA ESFERA ---
+            const normal = p.position.clone().normalize(); // Vector hacia afuera desde el centro del planeta
             
-            const normal = new THREE.Vector3(currentX, currentY, currentZ).normalize();
+            // Vector "World Up" auxiliar para calcular los ejes tangentes sin giros extraños
+            const worldUp = Math.abs(normal.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+            const east = new THREE.Vector3().crossVectors(worldUp, normal).normalize();
+            const north = new THREE.Vector3().crossVectors(normal, east).normalize();
 
-            // Definir los vectores base tangentes locales orientados por el heading (mirilla)
-            // Forward tangencial en la superficie esférica según la dirección de la vista
-            let forward = new THREE.Vector3(Math.sin(p.heading), 0, Math.cos(p.heading));
-            forward.addScaledVector(normal, -forward.dot(normal)).normalize();
-            if (forward.lengthSq() < 0.001) {
-                forward.set(0, 0, 1);
-                forward.addScaledVector(normal, -forward.dot(normal)).normalize();
-            }
+            // Dirección frontal base según el heading (Yaw) controlado por el mouse
+            const forward = new THREE.Vector3()
+                .addScaledVector(north, Math.cos(p.heading))
+                .addScaledVector(east, Math.sin(p.heading))
+                .normalize();
 
-            // Right tangencial (perpendicular a normal y forward) para el movimiento lateral (strafe A/D)
-            let right = new THREE.Vector3().crossVectors(normal, forward).normalize();
+            // Dirección lateral (Right / Strafe)
+            const right = new THREE.Vector3().crossVectors(normal, forward).normalize();
 
-            // --- MOVIMIENTO WASD ALINEADO CON LA MIRILLA ---
+            // --- MOVIMIENTO WASD ALINEADO EXACTAMENTE CON LA MIRILLA ---
             let moveForward = 0;
             let moveSide = 0;
 
@@ -221,39 +215,31 @@ const Game = {
             }
 
             if (moveForward !== 0 || moveSide !== 0) {
-                // Desplazamiento vectorial puro en coordenadas cartesianas sobre la superficie de la esfera
                 const moveDelta = new THREE.Vector3();
                 moveDelta.addScaledVector(forward, moveForward);
                 moveDelta.addScaledVector(right, moveSide);
 
-                // Proyectamos el movimiento para mantenerlo estrictamente pegado al radio de la esfera
-                const nextPos = p.mesh.position.clone().add(moveDelta);
-                nextPos.normalize().multiplyScalar(R);
-
-                // Actualizamos theta y phi a partir de la nueva posición cartesiana
-                p.phi = Math.acos(Math.max(-1, Math.min(1, nextPos.y / R)));
-                p.theta = Math.atan2(nextPos.x, nextPos.z);
-                p.phi = Math.max(0.05, Math.min(Math.PI - 0.05, p.phi));
+                // Aplicar desplazamiento manteniendo estrictamente la curvatura de la esfera
+                p.position.add(moveDelta);
+                p.position.normalize().multiplyScalar(this.planetRadius);
             }
 
-            // Posición final del jugador
-            const x = R * Math.sin(p.phi) * Math.sin(p.theta);
-            const y = R * Math.cos(p.phi);
-            const z = R * Math.sin(p.phi) * Math.cos(p.theta);
-
-            p.mesh.position.set(x, y, z);
+            // Actualizar posición del avatar
+            p.mesh.position.copy(p.position);
 
             if ((moveForward !== 0 || moveSide !== 0) && this.socket) {
-                this.socket.emit('playerMove', { x, y, z });
+                this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- POSICIÓN DE LA CÁMARA EN PRIMERA PERSONA (OJOS) ---
+            // --- CÁMARA PRIMERA PERSONA ESTABLE (OJOS) ---
             const eyeHeight = 0.75;
-            const eyePosition = p.mesh.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
+            const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
             this.camera.position.copy(eyePosition);
 
-            // --- VECTOR DE MIRADA INCLUYENDO PITCH Y YAW ---
-            // Rotamos el vector forward según el ángulo vertical (pitch) utilizando el vector right como eje de rotación
+            // Fijar el vector "Up" de la cámara a la normal de la esfera para eliminar el tilt ("oreja en el hombro")
+            this.camera.up.copy(normal);
+
+            // Vector de mirada final con Pitch (vertical) y Yaw (horizontal)
             const lookDir = forward.clone();
             lookDir.applyAxisAngle(right, p.pitch);
 
@@ -261,9 +247,7 @@ const Game = {
             this.camera.lookAt(targetLookAt);
         }
 
-        if (typeof WorldModule.rotatePlanet === 'function') {
-            WorldModule.rotatePlanet();
-        }
+        // Nota: Se omite rotatePlanet() para mantener el mundo fijo y estable bajo los pies del jugador.
         this.renderer.render(this.scene, this.camera);
     }
 };
