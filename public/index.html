@@ -46,11 +46,11 @@
         </div>
     </div>
 
-    <!-- 4. PANTALLA SELECCIÓN / CREACIÓN (CINEMÁTICA 3D ESTILO MU / DIABLO) -->
+    <!-- 4. PANTALLA SELECCIÓN / CREACIÓN (ESTILO ALBION 3D) -->
     <div id="screen-character" class="screen full-cinematic">
         <canvas id="characterCanvas" class="cinematic-canvas"></canvas>
 
-        <div id="panel-top-name" class="panel-top-name">
+        <div id="panel-top-name" class="panel-top-name" style="display: none;">
             <h2 id="char-display-name" style="margin: 0; font-size: 16px;">CLASE: GUERRERO</h2>
         </div>
 
@@ -58,14 +58,11 @@
         <button id="btn-arrow-left" class="btn-arrow arrow-left">&lt;</button>
         <button id="btn-arrow-right" class="btn-arrow arrow-right">&gt;</button>
 
-        <!-- Panel Central Inferior (Estilo Mu Online) -->
+        <!-- Panel Central Inferior Minimalista (Selección 3D y Creación) -->
         <div class="mu-select-panel">
-            <h3 style="font-size: 14px; margin-bottom: 8px;">SELECCIONA TU HÉROE</h3>
+            <h3 style="font-size: 13px; margin-bottom: 6px; letter-spacing: 1px;">HAZ CLIC EN TU HÉROE</h3>
             
-            <!-- Fila de Héroes Existentes -->
-            <div id="character-list" class="character-row"></div>
-
-            <!-- Botón de Nuevo Héroe (Debajo de los personajes) -->
+            <!-- Botón de Nuevo Héroe -->
             <button id="btn-to-create" class="btn-secondary">+ NUEVO HÉROE</button>
             <button id="btn-play" class="btn-large" style="display: none; background: #8b0000; border-color: #ffd700;">ENTRAR AL MUNDO</button>
             <button id="btn-logout" class="btn-secondary" style="font-size: 11px; padding: 6px;">CERRAR SESIÓN</button>
