@@ -16,7 +16,7 @@ const Game = {
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
         weaponRange: 15.0,
-        radius: 0.18 // Radio físico preciso para el cuerpo del avatar
+        radius: 0.15 // Radio físico compacto para evitar espacios visuales vacíos
     },
     remotePlayers: {},
     keys: {},
@@ -238,7 +238,7 @@ const Game = {
         }
     },
 
-    // --- DETECTOR DE COLISIONES OPTIMIZADO (EVITA ATASCOS Y CONTACTO EXAGERADO) ---
+    // --- DETECTOR DE COLISIONES FLUIDO SIN ATASCOS ---
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -251,8 +251,7 @@ const Game = {
 
         if (!obstacles || obstacles.length === 0) return false;
 
-        const playerRadius = this.localPlayer.radius; // 0.18
-        const currentDistToObstacle = (obsPos) => this.localPlayer.position.distanceTo(obsPos);
+        const playerRadius = this.localPlayer.radius; // 0.15
 
         for (let i = 0; i < obstacles.length; i++) {
             const obs = obstacles[i];
@@ -260,21 +259,21 @@ const Game = {
             if (!obsPos) continue;
 
             const nextDist = nextPos.distanceTo(obsPos);
-            const currentDist = currentDistToObstacle(obsPos);
+            const currentDist = this.localPlayer.position.distanceTo(obsPos);
             
-            const obstacleRadius = obs.radius || 0.2; 
-            const obstacleHeight = obs.height || 0.5;
+            const obstacleRadius = obs.radius || 0.18; 
+            const obstacleHeight = obs.height || 0.35;
 
-            // Si la nueva posición invade el radio horizontal del objeto
+            // Si estamos invadiendo el radio de colisión horizontal del objeto
             if (nextDist < (playerRadius + obstacleRadius)) {
-                // Si el jugador ya está dentro o encima del radio (atrapado), permitimos que se mueva si se está alejando
+                // Si el jugador está sobre el objeto o intentando salir de él, permitimos el movimiento libre
                 if (currentDist < (playerRadius + obstacleRadius)) {
-                    if (nextDist > currentDist) {
-                        return false; // Permite salir libremente sin necesidad de saltar
+                    if (nextDist >= currentDist) {
+                        return false; // Permite salir o moverse sin trabarse ni requerir salto obligatorio
                     }
                 }
 
-                // Si la altura del jugador es menor a la altura del obstáculo, bloquea el paso frontal
+                // Bloquea únicamente si se choca frontalmente contra un objeto cuya altura supera la del jugador
                 if (currentAltitude < obstacleHeight) {
                     return true; 
                 }
