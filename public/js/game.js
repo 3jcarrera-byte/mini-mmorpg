@@ -20,6 +20,7 @@ const Game = {
     isGameRunning: false,
     planetRadius: 5.0,
     gravity: 0.004,
+    cameraMode: 'first', // Modos: 'first', 'third', 'rts'
 
     start(characterData) {
         if (characterData) {
@@ -81,7 +82,7 @@ const Game = {
         this.localPlayer.altitude = 0;
         this.localPlayer.verticalVelocity = 0;
 
-        // Crear malla del jugador local (oculta en primera persona)
+        // Crear malla del jugador local
         this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
         this.scene.add(this.localPlayer.mesh);
 
@@ -92,7 +93,21 @@ const Game = {
         this.createDynamicCrosshair();
 
         // Eventos de teclado
-        window.addEventListener('keydown', e => this.keys[e.code] = true);
+        window.addEventListener('keydown', e => {
+            this.keys[e.code] = true;
+
+            // Cambiar modo de cámara con la tecla V
+            if (e.code === 'KeyV') {
+                if (this.cameraMode === 'first') {
+                    this.cameraMode = 'third';
+                } else if (this.cameraMode === 'third') {
+                    this.cameraMode = 'rts';
+                } else {
+                    this.cameraMode = 'first';
+                }
+            }
+        });
+
         window.addEventListener('keyup', e => this.keys[e.code] = false);
 
         canvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -112,7 +127,7 @@ const Game = {
                 this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
                 this.localPlayer.forward.normalize();
 
-                // Pitch (Inclinación vertical corregida / invertida)
+                // Pitch (Inclinación vertical)
                 this.localPlayer.pitch -= e.movementY * sensitivity;
                 this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
             }
@@ -155,11 +170,19 @@ const Game = {
 
     createPlayerAvatar(classType, customColor) {
         const group = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8), new THREE.MeshStandardMaterial({ color: customColor, visible: false }));
+        
+        // Cuerpo visible en 3era persona y RTS
+        const body = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8), 
+            new THREE.MeshStandardMaterial({ color: customColor })
+        );
         body.position.y = 0.3;
         group.add(body);
 
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: 0xffd700, visible: false }));
+        const head = new THREE.Mesh(
+            new THREE.SphereGeometry(0.12, 8, 8), 
+            new THREE.MeshStandardMaterial({ color: 0xffd700 })
+        );
         head.position.y = 0.7;
         group.add(head);
 
@@ -217,12 +240,18 @@ const Game = {
             }
 
             if (crosshair) {
-                if (isMoving) {
-                    crosshair.style.transform = 'translate(-50%, -50%) scale(1.4)';
-                    crosshair.style.borderColor = 'rgba(255, 100, 100, 0.9)';
+                if (this.cameraMode === 'first') {
+                    crosshair.style.display = 'block';
+                    if (isMoving) {
+                        crosshair.style.transform = 'translate(-50%, -50%) scale(1.4)';
+                        crosshair.style.borderColor = 'rgba(255, 100, 100, 0.9)';
+                    } else {
+                        crosshair.style.transform = 'translate(-50%, -50%) scale(1)';
+                        crosshair.style.borderColor = 'rgba(0, 255, 204, 0.8)';
+                    }
                 } else {
-                    crosshair.style.transform = 'translate(-50%, -50%) scale(1)';
-                    crosshair.style.borderColor = 'rgba(0, 255, 204, 0.8)';
+                    // Ocultar mirilla en tercera persona y RTS
+                    crosshair.style.display = 'none';
                 }
             }
 
@@ -246,22 +275,59 @@ const Game = {
 
             p.mesh.position.copy(p.position);
 
+            // Orientar la malla del avatar para que coincida con la superficie y la dirección de la mirada
+            const upVector = new THREE.Vector3(0, 1, 0);
+            const rotMatrix = new THREE.Matrix4().makeBasis(right, normal, p.forward.clone().negate());
+            p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
+
+            // Ocultar el avatar en primera persona para que no estorbe, mostrarlo en 3era y RTS
+            p.mesh.visible = (this.cameraMode !== 'first');
+
             if ((moveForward !== 0 || moveSide !== 0 || p.altitude > 0) && this.socket) {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- CÁMARA EN PRIMERA PERSONA ESTABLE ---
-            const eyeHeight = 0.75;
-            const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
-            this.camera.position.copy(eyePosition);
-
+            // --- GESTIÓN DE CÁMARAS SEGÚN EL MODO ---
             this.camera.up.copy(normal);
 
-            const lookDir = p.forward.clone();
-            lookDir.applyAxisAngle(right, p.pitch);
+            if (this.cameraMode === 'first') {
+                // 1. Primera Persona (Ojos)
+                const eyeHeight = 0.75;
+                const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
+                this.camera.position.copy(eyePosition);
 
-            const targetLookAt = eyePosition.clone().add(lookDir.multiplyScalar(5.0));
-            this.camera.lookAt(targetLookAt);
+                const lookDir = p.forward.clone();
+                lookDir.applyAxisAngle(right, p.pitch);
+                const targetLookAt = eyePosition.clone().add(lookDir.multiplyScalar(5.0));
+                this.camera.lookAt(targetLookAt);
+
+            } else if (this.cameraMode === 'third') {
+                // 2. Tercera Persona desde atrás
+                const distanceBack = 3.5;
+                const heightUp = 1.8;
+                const camPos = p.position.clone()
+                    .add(normal.clone().multiplyScalar(heightUp))
+                    .sub(p.forward.clone().multiplyScalar(distanceBack));
+                
+                this.camera.position.copy(camPos);
+                
+                // Mirar al personaje
+                const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.6));
+                this.camera.lookAt(targetLookAt);
+
+            } else if (this.cameraMode === 'rts') {
+                // 3. Vista Cenital / Estilo Warcraft 3
+                const rtsHeight = 7.5;
+                const rtsBack = 4.0;
+                const camPos = p.position.clone()
+                    .add(normal.clone().multiplyScalar(rtsHeight))
+                    .sub(p.forward.clone().multiplyScalar(rtsBack));
+
+                this.camera.position.copy(camPos);
+
+                // Mirar directamente al jugador desde arriba
+                this.camera.lookAt(p.position);
+            }
         }
 
         this.renderer.render(this.scene, this.camera);
