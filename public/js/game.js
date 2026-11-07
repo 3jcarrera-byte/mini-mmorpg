@@ -10,8 +10,8 @@ const Game = {
         color: 0xff0033,
         theta: 0, 
         phi: Math.PI / 2, 
-        heading: 0,   // Rotación horizontal (Yaw)
-        pitch: 0      // Inclinación vertical de la mirada (Pitch)
+        heading: 0,   // Yaw (Rotación horizontal)
+        pitch: 0      // Pitch (Inclinación vertical)
     },
     remotePlayers: {},
     keys: {},
@@ -77,7 +77,7 @@ const Game = {
         this.localPlayer.heading = 0;
         this.localPlayer.pitch = 0;
 
-        // Crear malla del jugador local
+        // Crear malla del jugador local (oculta en primera persona)
         this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
         this.scene.add(this.localPlayer.mesh);
 
@@ -93,7 +93,7 @@ const Game = {
 
         canvas.addEventListener('contextmenu', e => e.preventDefault());
         
-        // Activar Pointer Lock al hacer clic para controlar la vista completa con el mouse
+        // Activar Pointer Lock al hacer clic para control total con el mouse
         canvas.addEventListener('click', () => {
             canvas.requestPointerLock();
         });
@@ -101,11 +101,11 @@ const Game = {
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.0025;
-                // Rotación horizontal (Yaw / Giro lateral)
+                // Yaw: Giro horizontal de la mirada
                 this.localPlayer.heading -= e.movementX * sensitivity;
-                // Rotación vertical (Pitch / Ver suelo y cielo), limitada para no voltear la vista
+                // Pitch: Inclinación vertical (ver suelo y cielo libremente)
                 this.localPlayer.pitch -= e.movementY * sensitivity;
-                this.localPlayer.pitch = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, this.localPlayer.pitch));
+                this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
             }
         });
 
@@ -146,17 +146,11 @@ const Game = {
 
     createPlayerAvatar(classType, customColor) {
         const group = new THREE.Group();
-
-        // Ocultar cuerpo en primera persona
-        const bodyGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: customColor, visible: false });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8), new THREE.MeshStandardMaterial({ color: customColor, visible: false }));
         body.position.y = 0.3;
         group.add(body);
 
-        const headGeo = new THREE.SphereGeometry(0.12, 8, 8);
-        const headMat = new THREE.MeshStandardMaterial({ color: 0xffd700, visible: false });
-        const head = new THREE.Mesh(headGeo, headMat);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: 0xffd700, visible: false }));
         head.position.y = 0.7;
         group.add(head);
 
@@ -186,7 +180,28 @@ const Game = {
             const crosshair = document.getElementById('game-crosshair');
             let isMoving = false;
 
-            // --- LÓGICA DE MOVIMIENTO WASD / FLECHAS ---
+            // --- CÁLCULO DE VECTORES TANGENCIALES SOBRE LA ESFERA ---
+            // Primero calculamos la posición actual provisional para obtener la normal al planeta
+            const R = this.planetRadius;
+            const currentX = R * Math.sin(p.phi) * Math.sin(p.theta);
+            const currentY = R * Math.cos(p.phi);
+            const currentZ = R * Math.sin(p.phi) * Math.cos(p.theta);
+            
+            const normal = new THREE.Vector3(currentX, currentY, currentZ).normalize();
+
+            // Definir los vectores base tangentes locales orientados por el heading (mirilla)
+            // Forward tangencial en la superficie esférica según la dirección de la vista
+            let forward = new THREE.Vector3(Math.sin(p.heading), 0, Math.cos(p.heading));
+            forward.addScaledVector(normal, -forward.dot(normal)).normalize();
+            if (forward.lengthSq() < 0.001) {
+                forward.set(0, 0, 1);
+                forward.addScaledVector(normal, -forward.dot(normal)).normalize();
+            }
+
+            // Right tangencial (perpendicular a normal y forward) para el movimiento lateral (strafe A/D)
+            let right = new THREE.Vector3().crossVectors(normal, forward).normalize();
+
+            // --- MOVIMIENTO WASD ALINEADO CON LA MIRILLA ---
             let moveForward = 0;
             let moveSide = 0;
 
@@ -206,55 +221,43 @@ const Game = {
             }
 
             if (moveForward !== 0 || moveSide !== 0) {
-                const R = this.planetRadius;
-                // Movimiento alineado exactamente con la dirección de la mirilla (heading)
-                const deltaTheta = (moveForward * Math.sin(p.heading) + moveSide * Math.cos(p.heading)) / R;
-                const deltaPhi   = (-moveForward * Math.cos(p.heading) + moveSide * Math.sin(p.heading)) / R;
+                // Desplazamiento vectorial puro en coordenadas cartesianas sobre la superficie de la esfera
+                const moveDelta = new THREE.Vector3();
+                moveDelta.addScaledVector(forward, moveForward);
+                moveDelta.addScaledVector(right, moveSide);
 
-                p.theta += deltaTheta;
-                p.phi += deltaPhi;
+                // Proyectamos el movimiento para mantenerlo estrictamente pegado al radio de la esfera
+                const nextPos = p.mesh.position.clone().add(moveDelta);
+                nextPos.normalize().multiplyScalar(R);
 
+                // Actualizamos theta y phi a partir de la nueva posición cartesiana
+                p.phi = Math.acos(Math.max(-1, Math.min(1, nextPos.y / R)));
+                p.theta = Math.atan2(nextPos.x, nextPos.z);
                 p.phi = Math.max(0.05, Math.min(Math.PI - 0.05, p.phi));
             }
 
-            // Posición cartesiana 3D del personaje sobre la esfera
-            const R = this.planetRadius;
+            // Posición final del jugador
             const x = R * Math.sin(p.phi) * Math.sin(p.theta);
             const y = R * Math.cos(p.phi);
             const z = R * Math.sin(p.phi) * Math.cos(p.theta);
 
             p.mesh.position.set(x, y, z);
 
-            // Orientación de la malla
-            const normal = p.mesh.position.clone().normalize();
-            let tangent = new THREE.Vector3(-Math.cos(p.heading), 0, Math.sin(p.heading));
-            tangent.addScaledVector(normal, -tangent.dot(normal)).normalize();
-
-            if (tangent.lengthSq() < 0.001) {
-                tangent.set(0, 0, 1);
-                tangent.addScaledVector(normal, -tangent.dot(normal)).normalize();
-            }
-
-            const binormal = new THREE.Vector3().crossVectors(normal, tangent).normalize();
-            const rotMatrix = new THREE.Matrix4().makeBasis(binormal, normal, tangent);
-            p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
-
             if ((moveForward !== 0 || moveSide !== 0) && this.socket) {
                 this.socket.emit('playerMove', { x, y, z });
             }
 
-            // --- CÁMARA PRIMERA PERSONA CON PITCH Y YAW ---
-            const eyeHeight = 0.75; 
+            // --- POSICIÓN DE LA CÁMARA EN PRIMERA PERSONA (OJOS) ---
+            const eyeHeight = 0.75;
             const eyePosition = p.mesh.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
-
             this.camera.position.copy(eyePosition);
 
-            // Dirección hacia donde apunta la mirada considerando la rotación horizontal (heading) y vertical (pitch)
-            const lookDist = 5.0;
-            const forwardLook = tangent.clone().multiplyScalar(lookDist * Math.cos(p.pitch));
-            const verticalLook = normal.clone().multiplyScalar(lookDist * Math.sin(p.pitch));
-            
-            const targetLookAt = eyePosition.clone().add(forwardLook).add(verticalLook);
+            // --- VECTOR DE MIRADA INCLUYENDO PITCH Y YAW ---
+            // Rotamos el vector forward según el ángulo vertical (pitch) utilizando el vector right como eje de rotación
+            const lookDir = forward.clone();
+            lookDir.applyAxisAngle(right, p.pitch);
+
+            const targetLookAt = eyePosition.clone().add(lookDir.multiplyScalar(5.0));
             this.camera.lookAt(targetLookAt);
         }
 
