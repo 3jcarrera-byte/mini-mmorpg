@@ -1,4 +1,4 @@
-// Motor 3D de Selección y Creación de Clases Individuales con Panel de Atributos
+// Motor 3D de Selección y Creación con Posicionamiento Elevado
 const CharacterModule = (() => {
     let scene, camera, renderer;
     let characterMeshes = []; 
@@ -22,32 +22,33 @@ const CharacterModule = (() => {
         scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x000000, 0.08);
 
+        // Cámara posicionada para elevar la vista del personaje
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.8, 5.0);
+        camera.position.set(0, 2.2, 5.2);
 
         renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
 
-        // Iluminación
+        // Luces
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
-        const spotLight = new THREE.SpotLight(0xffd700, 2);
-        spotLight.position.set(0, 6, 4);
+        const spotLight = new THREE.SpotLight(0xffd700, 2.2);
+        spotLight.position.set(0, 7, 4);
         scene.add(spotLight);
 
-        // Suelo / Pedestal Central Único
-        const floorGeo = new THREE.CylinderGeometry(2.5, 2.5, 0.2, 32);
+        // Suelo / Pedestal Central Elevado en Y para no ser tapado por el menú
+        const floorGeo = new THREE.CylinderGeometry(2.2, 2.2, 0.2, 32);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.position.y = -0.1;
+        floor.position.y = 0.5; // Elevado de -0.1 a 0.5
         scene.add(floor);
 
-        // Crear todas las mallas de clase en el centro (x: 0) pero ocultas por defecto
+        // Mallas de clase en el centro elevado
         classes.forEach((c) => {
             const group = createCharacterMesh(c.color, `${c.name.toUpperCase()}`);
-            group.position.set(0, 0.4, 0); // Todos al centro exacto
+            group.position.set(0, 1.0, 0); // Posición base sobre el pedestal elevado
             group.visible = false;
             scene.add(group);
             classCreationMeshes[c.id] = group;
@@ -74,7 +75,7 @@ const CharacterModule = (() => {
         group.add(head);
 
         const labelSprite = createTransparentTextSprite(labelText);
-        labelSprite.position.set(0, 1.9, 0);
+        labelSprite.position.set(0, 1.95, 0);
         group.add(labelSprite);
 
         return group;
@@ -102,7 +103,6 @@ const CharacterModule = (() => {
         return sprite;
     }
 
-    // Renderiza los personajes del usuario de 1 en 1 de forma cíclica o centrados
     function renderUserCharacters3D(characterList) {
         characterMeshes.forEach(m => scene.remove(m));
         characterMeshes = [];
@@ -112,9 +112,9 @@ const CharacterModule = (() => {
         characterList.forEach((char) => {
             const classColor = char.classType === 'mago' ? 0x0088ff : (char.classType === 'arquero' ? 0x00ff66 : 0xff0033);
             const meshGroup = createCharacterMesh(classColor, `${char.name} (Lv.${char.level || 1})`);
-            meshGroup.position.set(0, 0, 0); // Todos centrados en el pedestal
+            meshGroup.position.set(0, 0.6, 0);
             meshGroup.userData = char; 
-            meshGroup.visible = false; // Solo mostramos el seleccionado por índice
+            meshGroup.visible = false;
 
             scene.add(meshGroup);
             characterMeshes.push(meshGroup);
@@ -142,7 +142,6 @@ const CharacterModule = (() => {
 
     function onCanvasClick(event) {
         if (isCreationMode) return;
-        // Si hay varios personajes, al hacer clic cicla al siguiente o lo selecciona
         if (characterMeshes.length > 1) {
             showUserCharacter(currentUserCharIndex + 1);
         }
@@ -165,10 +164,10 @@ const CharacterModule = (() => {
         if (instruction) instruction.innerText = active ? 'SELECCIONA TU CLASE' : 'HAZ CLIC PARA CAMBIAR HÉROE';
 
         if (active) {
-            camera.position.set(0, 2.0, 4.5);
+            camera.position.set(0, 2.5, 4.6);
             focusClass(0);
         } else {
-            camera.position.set(0, 1.8, 5.0);
+            camera.position.set(0, 2.2, 5.2);
             if (characterMeshes.length > 0) showUserCharacter(0);
         }
     }
@@ -177,12 +176,10 @@ const CharacterModule = (() => {
         currentClassIndex = (index + classes.length) % classes.length;
         const targetClass = classes[currentClassIndex];
         
-        // Ocultar todas las clases de creación y mostrar solo la actual en el centro
         Object.keys(classCreationMeshes).forEach(key => {
             classCreationMeshes[key].visible = (key === targetClass.id);
         });
 
-        // Actualizar textos de interfaz y atributos
         const nameEl = document.getElementById('char-display-name');
         if (nameEl) nameEl.innerText = `CLASE: ${targetClass.name.toUpperCase()}`;
 
