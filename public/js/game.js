@@ -8,9 +8,9 @@ const Game = {
         level: 1, 
         classType: 'guerrero', 
         color: 0xff0033,
-        position: new THREE.Vector3(0, 5.0, 0), // Posición 3D exacta en el mundo
-        heading: 0,   // Yaw (Rotación horizontal)
-        pitch: 0      // Pitch (Inclinación vertical)
+        position: new THREE.Vector3(0, 5.0, 0),
+        heading: 0, 
+        pitch: 0 
     },
     remotePlayers: {},
     keys: {},
@@ -91,7 +91,7 @@ const Game = {
 
         canvas.addEventListener('contextmenu', e => e.preventDefault());
         
-        // Activar Pointer Lock al hacer clic para control total con el mouse
+        // Activar Pointer Lock al hacer clic
         canvas.addEventListener('click', () => {
             canvas.requestPointerLock();
         });
@@ -99,10 +99,9 @@ const Game = {
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.0025;
-                // Yaw: Giro horizontal de la mirada
-                this.localPlayer.heading -= e.movementX * sensitivity;
-                // Pitch: Inclinación vertical corregida (mirar arriba y abajo de forma natural)
-                this.localPlayer.pitch -= e.movementY * sensitivity;
+                // Signos corregidos para evitar inversiones en los ejes
+                this.localPlayer.heading += e.movementX * sensitivity;
+                this.localPlayer.pitch += e.movementY * sensitivity;
                 this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
             }
         });
@@ -178,24 +177,23 @@ const Game = {
             const crosshair = document.getElementById('game-crosshair');
             let isMoving = false;
 
-            // --- NORMAL Y BASE TANGENCIAL ESTABLE EN LA ESFERA ---
-            const normal = p.position.clone().normalize(); // Vector hacia afuera desde el centro del planeta
-            
-            // Vector "World Up" auxiliar para calcular los ejes tangentes sin giros extraños
+            const R = this.planetRadius;
+            const normal = p.position.clone().normalize();
+
+            // --- CÁLCULO DE VECTORES BASADOS EN LA CÁMARA ---
+            // Construimos la orientación azimutal horizontal a partir del heading del mouse
             const worldUp = Math.abs(normal.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
             const east = new THREE.Vector3().crossVectors(worldUp, normal).normalize();
             const north = new THREE.Vector3().crossVectors(normal, east).normalize();
 
-            // Dirección frontal base según el heading (Yaw) controlado por el mouse
             const forward = new THREE.Vector3()
                 .addScaledVector(north, Math.cos(p.heading))
                 .addScaledVector(east, Math.sin(p.heading))
                 .normalize();
 
-            // Dirección lateral (Right / Strafe)
             const right = new THREE.Vector3().crossVectors(normal, forward).normalize();
 
-            // --- MOVIMIENTO WASD ALINEADO EXACTAMENTE CON LA MIRILLA ---
+            // --- MOVIMIENTO WASD ---
             let moveForward = 0;
             let moveSide = 0;
 
@@ -219,27 +217,24 @@ const Game = {
                 moveDelta.addScaledVector(forward, moveForward);
                 moveDelta.addScaledVector(right, moveSide);
 
-                // Aplicar desplazamiento manteniendo estrictamente la curvatura de la esfera
                 p.position.add(moveDelta);
-                p.position.normalize().multiplyScalar(this.planetRadius);
+                p.position.normalize().multiplyScalar(R);
             }
 
-            // Actualizar posición del avatar
             p.mesh.position.copy(p.position);
 
             if ((moveForward !== 0 || moveSide !== 0) && this.socket) {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- CÁMARA PRIMERA PERSONA ESTABLE (OJOS) ---
+            // --- POSICIÓN DE CÁMARA ESTABLE EN PRIMERA PERSONA ---
             const eyeHeight = 0.75;
             const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
             this.camera.position.copy(eyePosition);
 
-            // Fijar el vector "Up" de la cámara a la normal de la esfera para eliminar el tilt ("oreja en el hombro")
+            // Fijamos el vector Up de la cámara a la normal de la esfera para evitar inclinaciones ("oreja en el hombro")
             this.camera.up.copy(normal);
 
-            // Vector de mirada final con Pitch (vertical) y Yaw (horizontal)
             const lookDir = forward.clone();
             lookDir.applyAxisAngle(right, p.pitch);
 
@@ -247,7 +242,6 @@ const Game = {
             this.camera.lookAt(targetLookAt);
         }
 
-        // Nota: Se omite rotatePlanet() para mantener el mundo fijo y estable bajo los pies del jugador.
         this.renderer.render(this.scene, this.camera);
     }
 };
