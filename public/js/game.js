@@ -33,6 +33,8 @@ const Game = {
         this.camera.position.set(0, 12, 10);
 
         const canvas = document.getElementById('mapCanvas');
+        if (!canvas) return;
+
         this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
         this.renderer.setSize(800, 600);
 
