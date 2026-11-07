@@ -1,6 +1,6 @@
 const Game = {
     socket: null, scene: null, camera: null, renderer: null,
-    localPlayer: { mesh: null, speed: 0.15, wood: 100 },
+    localPlayer: { mesh: null, speed: 0.15, wood: 100, name: 'Héroe', level: 0 },
     remotePlayers: {},
     structures: [],
     npcs: {}, // Almacena los monstruos controlados por el servidor
@@ -8,13 +8,19 @@ const Game = {
     buildMode: 'wood',
     keys: {},
 
-    start() {
-        const selectedChar = CharacterCreator.getSelectedCharacter();
+    start(characterData) {
+        if (characterData) {
+            this.localPlayer.name = characterData.name || 'Héroe';
+            this.localPlayer.level = characterData.level || 1;
+        }
         App.changeScreen('screen-game');
         this.initEngine();
-        if (this.localPlayer.mesh) {
-            this.localPlayer.mesh.material.color.set(selectedChar.color);
+        
+        // Asignar color si viene en el personaje seleccionado
+        if (this.localPlayer.mesh && characterData && characterData.color) {
+            this.localPlayer.mesh.material.color.set(characterData.color);
         }
+
         this.connectServer();
         this.loop();
     },
@@ -43,6 +49,7 @@ const Game = {
         grid.position.y = 0.02;
         this.scene.add(grid);
 
+        // Crear malla del jugador local (Cápsula/Cilindro)
         this.localPlayer.mesh = new THREE.Mesh(
             new THREE.CylinderGeometry(0.4, 0.4, 2.0, 16), 
             new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.4 })
@@ -50,27 +57,60 @@ const Game = {
         this.localPlayer.mesh.position.set(0, 1.0, 0);
         this.scene.add(this.localPlayer.mesh);
 
+        // Añadir etiqueta de nombre y nivel sobre la cabeza del jugador local
+        const localLabel = this.createTextSprite(`${this.localPlayer.name} (Lv.${this.localPlayer.level})`);
+        localLabel.position.set(0, 1.4, 0);
+        this.localPlayer.mesh.add(localLabel);
+
         window.addEventListener('keydown', e => this.keys[e.key.toLowerCase()] = true);
         window.addEventListener('keyup', e => this.keys[e.key.toLowerCase()] = false);
         canvas.addEventListener('contextmenu', e => e.preventDefault());
         canvas.addEventListener('mousedown', e => this.handleBuildClick(e));
     },
 
+    // Utilidad para crear etiquetas de texto flotantes sobre la cabeza 3D
+    createTextSprite(message) {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 256;
+        canvas.height = 64;
+
+        context.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        context.font = 'bold 24px "Courier New", monospace';
+        context.fillStyle = '#ffd700';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(message, canvas.width / 2, canvas.height / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(1.5, 0.4, 1);
+        return sprite;
+    },
+
     connectServer() {
         this.socket = io();
 
         this.socket.on('initWorld', (data) => {
-            document.getElementById('ui-wood').innerText = this.localPlayer.wood;
-            data.structures.forEach(s => this.drawStructure(s));
-            
-            Object.keys(data.players).forEach(id => {
-                if (id !== this.socket.id) this.addRemotePlayer(data.players[id]);
-            });
+            const woodEl = document.getElementById('ui-wood');
+            if (woodEl) woodEl.innerText = this.localPlayer.wood;
 
-            // Inicializar los NPCs que la IA del servidor creó
-            Object.keys(data.npcs).forEach(id => {
-                this.addNPC(data.npcs[id]);
-            });
+            if (data.structures) data.structures.forEach(s => this.drawStructure(s));
+            
+            if (data.players) {
+                Object.keys(data.players).forEach(id => {
+                    if (id !== this.socket.id) this.addRemotePlayer(data.players[id]);
+                });
+            }
+
+            if (data.npcs) {
+                Object.keys(data.npcs).forEach(id => {
+                    this.addNPC(data.npcs[id]);
+                });
+            }
         });
 
         this.socket.on('newPlayer', data => this.addRemotePlayer(data));
@@ -81,10 +121,8 @@ const Game = {
             }
         });
 
-        // Escuchar las actualizaciones de posición que envía la IA del servidor
         this.socket.on('npcMoved', data => {
             if (this.npcs[data.id]) {
-                // Movimiento fluido del NPC en el mapa abierto 3D
                 this.npcs[data.id].position.x = data.x;
                 this.npcs[data.id].position.z = data.z;
             }
@@ -101,17 +139,25 @@ const Game = {
     },
 
     addRemotePlayer(p) {
-        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 2.0, 16), new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.4 }));
+        const mesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.4, 0.4, 2.0, 16), 
+            new THREE.MeshStandardMaterial({ color: p.color || 0xffffff, roughness: 0.4 })
+        );
         mesh.position.set(p.x, 1.0, p.z);
+        
+        // Etiqueta flotante para jugadores remotos
+        const label = this.createTextSprite(`${p.name || 'Héroe'} (Lv.${p.level || 1})`);
+        label.position.set(0, 1.4, 0);
+        mesh.add(label);
+
         this.scene.add(mesh);
         this.remotePlayers[p.id] = mesh;
     },
 
     addNPC(npcData) {
-        // Dibujar al monstruo controlado por IA como una cápsula verde
         const mesh = new THREE.Mesh(
             new THREE.CylinderGeometry(0.4, 0.4, 2.0, 16), 
-            new THREE.MeshStandardMaterial({ color: npcData.color, roughness: 0.5 })
+            new THREE.MeshStandardMaterial({ color: npcData.color || 0x00ff00, roughness: 0.5 })
         );
         mesh.position.set(npcData.x, 1.0, npcData.z);
         this.scene.add(mesh);
@@ -128,11 +174,13 @@ const Game = {
 
                 this.socket.emit('buildStructure', { x: snapX, y: snapY, z: snapZ, type: this.buildMode });
                 this.localPlayer.wood -= 10;
-                document.getElementById('ui-wood').innerText = this.localPlayer.wood;
+                const woodEl = document.getElementById('ui-wood');
+                if (woodEl) woodEl.innerText = this.localPlayer.wood;
             }
         } else if (e.button === 2) {
             this.buildMode = this.buildMode === 'wood' ? 'stone' : 'wood';
-            document.getElementById('ui-build').innerText = this.buildMode.toUpperCase();
+            const buildEl = document.getElementById('ui-build');
+            if (buildEl) buildEl.innerText = this.buildMode.toUpperCase();
         }
     },
 
@@ -170,3 +218,5 @@ const Game = {
         this.renderer.render(this.scene, this.camera);
     }
 };
+
+window.GameModule = Game;
