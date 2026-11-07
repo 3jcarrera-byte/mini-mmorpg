@@ -5,26 +5,16 @@ const WorldModule = (() => {
     const planetRadius = 5;
     const structures = [];
     const obstacles = []; // Almacén global de obstáculos para colisiones
-    const interactiveObjects = []; // Almacén para objetos recolectables o dinámicos
-    const textureLoader = new THREE.TextureLoader();
+    const interactiveObjects = []; 
 
     function createPlanet(scene, worldConfig = {}) {
-        // Limpiar obstáculos anteriores si se recarga el mundo
         obstacles.length = 0;
         structures.length = 0;
         interactiveObjects.length = 0;
 
-        const groundTexture = worldConfig.textureUrl ? textureLoader.load(worldConfig.textureUrl) : null;
-        if (groundTexture) {
-            groundTexture.wrapS = THREE.RepeatWrapping;
-            groundTexture.wrapT = THREE.RepeatWrapping;
-            groundTexture.repeat.set(4, 4);
-        }
-
         const planetGeo = new THREE.SphereGeometry(planetRadius, 32, 32);
         const planetMat = new THREE.MeshStandardMaterial({ 
             color: worldConfig.color || 0x1a4314, 
-            map: groundTexture,
             roughness: 0.8,
             flatShading: true 
         });
@@ -34,6 +24,81 @@ const WorldModule = (() => {
 
         generateFeatures(scene, worldConfig.treeCount || 35, worldConfig.rockCount || 25);
         return planetMesh;
+    }
+
+    // --- DISEÑO DETALLADO DE ÁRBOLES Y ROCAS ---
+    function createDetailedTree(position) {
+        const group = new THREE.Group();
+        
+        // Tronco
+        const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.45, 6);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9, flatShading: true });
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 0.22;
+        group.add(trunk);
+
+        // Copas en capas (estilo pino estilizado)
+        const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d8a39, roughness: 0.7, flatShading: true });
+        
+        const layer1 = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.45, 5), leavesMat);
+        layer1.position.y = 0.45;
+        group.add(layer1);
+
+        const layer2 = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.35, 5), leavesMat);
+        layer2.position.y = 0.7;
+        group.add(layer2);
+
+        const layer3 = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.25, 5), leavesMat);
+        layer3.position.y = 0.9;
+        group.add(layer3);
+
+        group.position.copy(position);
+        group.lookAt(0, 0, 0);
+        group.rotateX(Math.PI / 2);
+        group.position.addScaledVector(group.position.clone().normalize(), 0.05);
+
+        return {
+            mesh: group,
+            collider: {
+                position: group.position.clone(),
+                radius: 0.18,
+                height: 0.6
+            },
+            resourceType: 'wood',
+            resourceAmount: 15
+        };
+    }
+
+    function createDetailedRock(position) {
+        const group = new THREE.Group();
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x7a7a7a, roughness: 0.85, flatShading: true });
+        
+        const mainGeo = new THREE.DodecahedronGeometry(0.22, 0);
+        const mainRock = new THREE.Mesh(mainGeo, rockMat);
+        mainRock.scale.set(1.2, 0.8, 1.0);
+        mainRock.position.y = 0.12;
+        group.add(mainRock);
+
+        const smallGeo = new THREE.DodecahedronGeometry(0.12, 0);
+        const smallRock = new THREE.Mesh(smallGeo, rockMat);
+        smallRock.position.set(0.15, 0.06, 0.1);
+        group.add(smallRock);
+
+        group.position.copy(position);
+        group.lookAt(0, 0, 0);
+        group.rotateX(Math.PI / 2);
+        group.position.addScaledVector(group.position.clone().normalize(), 0.04);
+
+        return {
+            mesh: group,
+            collider: {
+                position: group.position.clone(),
+                radius: 0.22,
+                height: 0.35
+            },
+            resourceType: 'stone',
+            resourceAmount: 20
+        };
     }
 
     function generateFeatures(scene, trees, rocks) {
@@ -47,38 +112,10 @@ const WorldModule = (() => {
             const x = r * Math.sin(phi) * Math.cos(theta);
             const y = r * Math.sin(phi) * Math.sin(theta);
             const z = r * Math.cos(phi);
-
             const position = new THREE.Vector3(x, y, z);
+
             const isTree = i < trees;
-
-            // Delegar la creación a los submódulos independientes si existen, de lo contrario usar fallback seguro
-            let featureData;
-            if (isTree && window.TreeObject) {
-                featureData = window.TreeObject.create(position);
-            } else if (!isTree && window.RockObject) {
-                featureData = window.RockObject.create(position);
-            } else {
-                // Fallback clásico por si los submódulos cargan después
-                const featureGeo = new THREE.ConeGeometry(0.2, 0.5, 5);
-                const mat = new THREE.MeshStandardMaterial({ color: isTree ? 0x0b6623 : 0x666666, flatShading: true });
-                const mesh = new THREE.Mesh(featureGeo, mat);
-                mesh.position.copy(position);
-                mesh.lookAt(0, 0, 0);
-                mesh.rotateX(Math.PI / 2);
-                mesh.position.addScaledVector(mesh.position.clone().normalize(), 0.05);
-                scene.add(mesh);
-
-                featureData = {
-                    mesh: mesh,
-                    collider: {
-                        position: mesh.position.clone(),
-                        radius: 0.18,
-                        height: 0.35
-                    },
-                    resourceType: isTree ? 'wood' : 'stone',
-                    resourceAmount: isTree ? 10 : 15
-                };
-            }
+            const featureData = isTree ? createDetailedTree(position) : createDetailedRock(position);
 
             if (featureData) {
                 if (featureData.mesh) scene.add(featureData.mesh);
@@ -88,7 +125,6 @@ const WorldModule = (() => {
         }
     }
 
-    // Permitir construir cimientos en superficie (depth = 0) o subterráneos hacia abajo (depth = -1)
     function buildStructure(scene, theta, phi, depthLevel = 0) {
         const currentRadius = planetRadius + (depthLevel * 0.3); 
         const x = currentRadius * Math.sin(phi) * Math.cos(theta);
@@ -109,7 +145,6 @@ const WorldModule = (() => {
         scene.add(structureMesh);
         structures.push(structureMesh);
 
-        // Registrar estructura construida como obstáculo con radio preciso
         obstacles.push({
             position: structureMesh.position.clone(),
             radius: 0.25,
