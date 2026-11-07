@@ -1,11 +1,13 @@
-// Motor 3D de Selección y Creación - Limpieza de Escena y Control Estricto de Visibilidad
+// Motor 3D de Selección - Múltiples Héroes Simultáneos en Línea con Raycasting
 const CharacterModule = (() => {
     let scene, camera, renderer;
     let characterMeshes = []; 
     let classCreationMeshes = {}; 
     let isCreationMode = false;
     let currentClassIndex = 0;
-    let currentUserCharIndex = 0;
+    let selectedCharacterData = null;
+    let raycaster = new THREE.Raycaster();
+    let mouse = new THREE.Vector2();
 
     const classes = [
         { id: 'guerrero', name: 'Guerrero', color: 0xff0033, radius: 0.32, height: 1.1, stats: { str: 15, def: 12, spd: 8, agi: 7, mana: 5 } },
@@ -21,7 +23,7 @@ const CharacterModule = (() => {
         scene.fog = new THREE.FogExp2(0x000000, 0.08);
 
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 2.7, 4.2);
+        camera.position.set(0, 2.7, 4.8);
         camera.lookAt(0, 1.2, 0);
 
         renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
@@ -35,14 +37,14 @@ const CharacterModule = (() => {
         spotLight.position.set(0, 7, 4);
         scene.add(spotLight);
 
-        // Pedestal Central
-        const floorGeo = new THREE.CylinderGeometry(2.2, 2.2, 0.2, 32);
+        // Pedestal Central Amplio para acomodar varios héroes
+        const floorGeo = new THREE.CylinderGeometry(2.8, 2.8, 0.2, 32);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.position.y = 0.5;
         scene.add(floor);
 
-        // Mallas para creación de clases (Inicialmente ocultas)
+        // Mallas para creación de clases
         classes.forEach((c) => {
             const group = createCharacterMesh(c.color, `${c.name.toUpperCase()}`, c.radius, c.height);
             group.position.set(0, 0.6, 0);
@@ -71,7 +73,6 @@ const CharacterModule = (() => {
         head.position.y = height + 0.22;
         group.add(head);
 
-        // Posicionar sprite para evitar superposición con el texto de la clase
         const labelSprite = createTransparentTextSprite(labelText);
         labelSprite.position.set(0, height + 0.6, 0);
         group.add(labelSprite);
@@ -118,13 +119,6 @@ const CharacterModule = (() => {
             if (equipment.mana) stats.mana += equipment.mana;
         }
 
-        if (Array.isArray(statusEffects)) {
-            statusEffects.forEach(effect => {
-                if (effect.type === 'buff_str') stats.str += effect.value;
-                if (effect.type === 'buff_def') stats.def += effect.value;
-            });
-        }
-
         return {
             str: Math.round(stats.str),
             def: Math.round(stats.def),
@@ -134,45 +128,53 @@ const CharacterModule = (() => {
         };
     }
 
-    // Remueve y destruye de forma segura mallas anteriores para evitar solapamientos 3D
+    // Renderiza a TODOS los personajes del usuario simultáneamente en fila horizontal
     function renderUserCharacters3D(characterList) {
         characterMeshes.forEach(m => scene.remove(m));
         characterMeshes = [];
 
         if (isCreationMode) return;
 
-        characterList.forEach((char) => {
+        const total = characterList.length;
+        const spacing = 1.4; // Distancia horizontal entre cada héroe
+
+        characterList.forEach((char, index) => {
             const classConfig = classes.find(c => c.id === char.classType) || classes[0];
             const meshGroup = createCharacterMesh(classConfig.color, `${char.name} (Lv.${char.level || 1})`, classConfig.radius, classConfig.height);
-            meshGroup.position.set(0, 0.6, 0);
+            
+            // Distribuir en el eje X: si hay 2, se colocan a -0.7 y +0.7, etc.
+            const offsetX = (index - (total - 1) / 2) * spacing;
+            meshGroup.position.set(offsetX, 0.6, 0);
             meshGroup.userData = char; 
-            meshGroup.visible = false;
+            meshGroup.visible = true;
 
             scene.add(meshGroup);
             characterMeshes.push(meshGroup);
         });
 
         if (characterMeshes.length > 0) {
-            showUserCharacter(0);
+            selectCharacter(characterMeshes[0]); // Seleccionar por defecto el primero
         }
     }
 
-    function showUserCharacter(index) {
-        if (characterMeshes.length === 0) return;
-        currentUserCharIndex = (index + characterMeshes.length) % characterMeshes.length;
-        
-        // Garantizar que solo un personaje sea visible a la vez
-        characterMeshes.forEach((m, idx) => {
-            m.visible = (idx === currentUserCharIndex && !isCreationMode);
+    function selectCharacter(meshGroup) {
+        selectedCharacterData = meshGroup.userData;
+
+        // Efecto visual de selección (resaltar escala sutilmente)
+        characterMeshes.forEach(m => {
+            if (m === meshGroup) {
+                m.scale.set(1.1, 1.1, 1.1);
+            } else {
+                m.scale.set(1.0, 1.0, 1.0);
+            }
         });
 
-        const activeChar = characterMeshes[currentUserCharIndex].userData;
-        if (activeChar && !isCreationMode) {
+        const activeChar = selectedCharacterData;
+        if (activeChar) {
             const baseClass = classes.find(c => c.id === activeChar.classType) || classes[0];
             const finalStats = calculateFinalStats(baseClass.stats, activeChar.level || 1, activeChar.equipment, activeChar.statusEffects);
             
-            const strEl = document.getElementById('stat-str');
-            if (strEl) {
+            if (document.getElementById('stat-str')) {
                 document.getElementById('stat-str').innerText = finalStats.str;
                 document.getElementById('stat-def').innerText = finalStats.def;
                 document.getElementById('stat-spd').innerText = finalStats.spd;
@@ -186,18 +188,36 @@ const CharacterModule = (() => {
         }
     }
 
+    // Detección por Raycasting mediante Clic Directo en el Personaje
     function onCanvasClick(event) {
-        if (isCreationMode) return;
-        if (characterMeshes.length > 1) {
-            showUserCharacter(currentUserCharIndex + 1);
+        if (isCreationMode || characterMeshes.length === 0) return;
+
+        const canvas = renderer.domElement;
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / canvas.clientWidth) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / canvas.clientHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        
+        // Recoger todos los hijos de los grupos de personajes para la intersección
+        let intersects = [];
+        characterMeshes.forEach(group => {
+            const hits = raycaster.intersectObjects(group.children, true);
+            if (hits.length > 0) {
+                intersects.push({ group: group, distance: hits[0].distance });
+            }
+        });
+
+        if (intersects.length > 0) {
+            // Ordenar por cercanía y seleccionar el clickeado
+            intersects.sort((a, b) => a.distance - b.distance);
+            selectCharacter(intersects[0].group);
         }
     }
 
     function setCreationMode(active) {
         isCreationMode = active;
-
-        // Ocultar mallas de personajes existentes si entramos a modo creación
-        characterMeshes.forEach(m => m.visible = false);
+        characterMeshes.forEach(m => m.visible = !active);
 
         const topName = document.getElementById('panel-top-name');
         const arrowLeft = document.getElementById('btn-arrow-left');
@@ -209,18 +229,17 @@ const CharacterModule = (() => {
         if (arrowLeft) arrowLeft.style.display = active ? 'block' : 'none';
         if (arrowRight) arrowRight.style.display = active ? 'block' : 'none';
         if (attributesPanel) attributesPanel.style.display = active ? 'flex' : 'none';
-        if (instruction) instruction.innerText = active ? 'SELECCIONA TU CLASE' : 'HAZ CLIC PARA CAMBIAR HÉROE';
+        if (instruction) instruction.innerText = active ? 'SELECCIONA TU CLASE' : 'HAZ CLIC EN TU HÉROE PARA SELECCIONARLO';
 
         if (active) {
             camera.position.set(0, 2.7, 4.2);
             camera.lookAt(0, 1.2, 0);
             focusClass(0);
         } else {
-            // Ocultar mallas de clase al salir de modo creación
             Object.keys(classCreationMeshes).forEach(k => classCreationMeshes[k].visible = false);
-            camera.position.set(0, 2.2, 5.2);
-            camera.lookAt(0, 1.0, 0);
-            if (characterMeshes.length > 0) showUserCharacter(currentUserCharIndex);
+            camera.position.set(0, 2.7, 4.8);
+            camera.lookAt(0, 1.2, 0);
+            if (characterMeshes.length > 0) selectCharacter(characterMeshes[0]);
         }
     }
 
@@ -248,7 +267,7 @@ const CharacterModule = (() => {
     function animate() {
         requestAnimationFrame(animate);
         if (!isCreationMode) {
-            characterMeshes.forEach(m => { if(m.visible) m.rotation.y += 0.008; });
+            characterMeshes.forEach(m => m.rotation.y += 0.005);
         } else {
             Object.keys(classCreationMeshes).forEach(k => {
                 if (classCreationMeshes[k].visible) classCreationMeshes[k].rotation.y += 0.01;
@@ -270,14 +289,12 @@ const CharacterModule = (() => {
         setCreationMode,
         calculateFinalStats,
         getCurrentClass: () => classes[currentClassIndex],
-        getSelectedCharacter: () => characterMeshes[currentUserCharIndex] ? characterMeshes[currentUserCharIndex].userData : null,
+        getSelectedCharacter: () => selectedCharacterData,
         nextClass: () => {
             if (isCreationMode) focusClass(currentClassIndex + 1);
-            else showUserCharacter(currentUserCharIndex + 1);
         },
         prevClass: () => {
             if (isCreationMode) focusClass(currentClassIndex - 1);
-            else showUserCharacter(currentUserCharIndex - 1);
         }
     };
 })();
