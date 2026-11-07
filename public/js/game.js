@@ -2,7 +2,7 @@ const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
         mesh: null, 
-        speed: 0.06, 
+        speed: 0.05, 
         wood: 100, 
         name: 'Héroe', 
         level: 1, 
@@ -10,7 +10,7 @@ const Game = {
         color: 0xff0033,
         theta: 0, 
         phi: Math.PI / 2, 
-        heading: 0 // Ángulo de rotación del personaje
+        heading: 0 
     },
     remotePlayers: {},
     keys: {},
@@ -75,7 +75,7 @@ const Game = {
         this.localPlayer.phi = 0.3;
         this.localPlayer.heading = 0;
 
-        // Crear malla del jugador local con su visor indicador de dirección
+        // Crear malla del jugador local
         this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
         this.scene.add(this.localPlayer.mesh);
 
@@ -106,11 +106,11 @@ const Game = {
         head.position.y = 0.7;
         group.add(head);
 
-        // Visor / Parte frontal (Indica claramente hacia dónde mira el personaje)
+        // Visor frontal (Indica hacia dónde mira)
         const faceGeo = new THREE.BoxGeometry(0.14, 0.06, 0.05);
         const faceMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 });
         const face = new THREE.Mesh(faceGeo, faceMat);
-        face.position.set(0, 0.7, 0.12); // Al frente (+Z local)
+        face.position.set(0, 0.7, 0.12);
         group.add(face);
 
         return group;
@@ -136,36 +136,31 @@ const Game = {
 
         if (this.localPlayer.mesh) {
             const p = this.localPlayer;
-            const turnSpeed = 0.04;
+            const turnSpeed = 0.05;
 
-            // Giro del personaje con las flechas de dirección (Izquierda / Derecha)
-            if (this.keys['ArrowLeft'] || this.keys['KeyQ']) p.heading += turnSpeed;
-            if (this.keys['ArrowRight'] || this.keys['KeyE']) p.heading -= turnSpeed;
+            // Giro libre de 360° con flechas izquierda/derecha o A/D para girar la vista
+            if (this.keys['ArrowLeft'] || this.keys['KeyA']) p.heading += turnSpeed;
+            if (this.keys['ArrowRight'] || this.keys['KeyD']) p.heading -= turnSpeed;
 
-            // Cálculo de movimiento relativo tipo Shooter (W = adelante, S = atrás, A = izq, D = der)
-            let moveForward = 0;
-            let moveSide = 0;
+            // Movimiento hacia adelante (W) y hacia atrás (S) basado en la dirección a la que apunta el visor
+            let moveDir = 0;
+            if (this.keys['KeyW'] || this.keys['ArrowUp']) moveDir += p.speed;
+            if (this.keys['KeyS'] || this.keys['ArrowDown']) moveDir -= p.speed;
 
-            if (this.keys['KeyW'] || this.keys['ArrowUp']) moveForward += p.speed;
-            if (this.keys['KeyS'] || this.keys['ArrowDown']) moveForward -= p.speed;
-            if (this.keys['KeyA']) moveSide -= p.speed; // Strafe izquierda
-            if (this.keys['KeyD']) moveSide += p.speed; // Strafe derecha
-
-            if (moveForward !== 0 || moveSide !== 0) {
+            if (moveDir !== 0) {
                 const R = this.planetRadius;
+                // Desplazamiento esférico alineado con el heading actual del personaje
+                const deltaTheta = (moveDir * Math.sin(p.heading)) / R;
+                const deltaPhi   = (-moveDir * Math.cos(p.heading)) / R;
 
-                // Vectores de desplazamiento basados en el heading actual del personaje sobre la esfera
-                const fwdDeltaTheta = (moveForward * Math.sin(p.heading) + moveSide * Math.cos(p.heading)) / R;
-                const fwdDeltaPhi   = (-moveForward * Math.cos(p.heading) + moveSide * Math.sin(p.heading)) / R;
+                p.theta += deltaTheta;
+                p.phi += deltaPhi;
 
-                p.theta += fwdDeltaTheta;
-                p.phi += fwdDeltaPhi;
-
-                // Restringir phi para no rebasar los polos
+                // Limitar phi para no voltear el mundo en los polos
                 p.phi = Math.max(0.05, Math.min(Math.PI - 0.05, p.phi));
             }
 
-            // Posición cartesiana final sobre la esfera
+            // Calcular posición cartesiana 3D del personaje sobre la esfera
             const R = this.planetRadius;
             const x = R * Math.sin(p.phi) * Math.sin(p.theta);
             const y = R * Math.cos(p.phi);
@@ -173,7 +168,7 @@ const Game = {
 
             p.mesh.position.set(x, y, z);
 
-            // Orientación física del avatar sobre la superficie esférica
+            // Orientación y alineación perfecta de la malla sobre la superficie curva del planeta
             const normal = p.mesh.position.clone().normalize();
             let tangent = new THREE.Vector3(-Math.cos(p.heading), 0, Math.sin(p.heading));
             tangent.addScaledVector(normal, -tangent.dot(normal)).normalize();
@@ -187,26 +182,27 @@ const Game = {
             const rotMatrix = new THREE.Matrix4().makeBasis(binormal, normal, tangent);
             p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
 
-            if ((moveForward !== 0 || moveSide !== 0) && this.socket) {
+            if (moveDir !== 0 && this.socket) {
                 this.socket.emit('playerMove', { x, y, z });
             }
 
-            // --- CÁMARA TERCERA PERSONA DIRECTA DETRÁS DE LA ESPALDA ---
-            const camDistBack = 3.2;  // Distancia hacia atrás
-            const camHeightUp = 1.4;  // Altura sobre el hombro
+            // --- CÁMARA TERCERA PERSONA (ÁNGULO 45° A ~5 METROS DETRÁS DE LA ESPALDA) ---
+            const distanceBack = 3.8;  // Distancia aproximada hacia atrás
+            const heightUp = 2.5;      // Altura para lograr el ángulo de ~45 grados
 
-            // Dirección opuesta al heading (detrás del personaje)
-            const backwardDir = new THREE.Vector3(Math.sin(p.heading), 0, -Math.cos(p.heading)).normalize();
+            // Vector dirección hacia atrás basado en el heading del personaje
+            const backwardDir = new THREE.Vector3(-Math.sin(p.heading), 0, Math.cos(p.heading)).normalize();
             backwardDir.addScaledVector(normal, -backwardDir.dot(normal)).normalize();
 
+            // Posición ideal de la cámara
             const targetCamPos = p.mesh.position.clone()
-                .add(normal.clone().multiplyScalar(camHeightUp))
-                .add(backwardDir.multiplyScalar(camDistBack));
+                .add(normal.clone().multiplyScalar(heightUp))
+                .add(backwardDir.multiplyScalar(distanceBack));
 
-            // Seguir con suavidad al personaje
-            this.camera.position.lerp(targetCamPos, 0.3);
+            // Suavizado fluido de la cámara al seguir al personaje
+            this.camera.position.lerp(targetCamPos, 0.2);
 
-            // Apuntar la cámara exactamente hacia el frente del personaje
+            // La cámara apunta hacia el personaje (llevando la mirada un poco más arriba de sus pies)
             const lookTarget = p.mesh.position.clone().add(normal.clone().multiplyScalar(0.5));
             this.camera.lookAt(lookTarget);
         }
