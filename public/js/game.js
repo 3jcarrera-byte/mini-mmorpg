@@ -86,6 +86,13 @@ const Game = {
         head.position.y = 0.7;
         group.add(head);
 
+        // Visor / Parte frontal de la cara (Color diferente para indicar hacia dónde mira)
+        const faceGeo = new THREE.BoxGeometry(0.14, 0.06, 0.05);
+        const faceMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 });
+        const face = new THREE.Mesh(faceGeo, faceMat);
+        face.position.set(0, 0.7, 0.1); // Posicionado al frente (+Z local)
+        group.add(face);
+
         return group;
     },
 
