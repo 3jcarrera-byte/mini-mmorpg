@@ -8,6 +8,7 @@ body {
 .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; background-color: #000000; }
 .screen.active { display: flex; }
 
+/* Cajas de la interfaz estándar */
 .box { 
     border: 3px solid transparent;
     border-image: linear-gradient(135deg, #ffd700, #ff0033) 1;
@@ -50,41 +51,11 @@ button:hover {
     box-shadow: 0 0 25px rgba(0,0,0,0.9);
 }
 
-/* Panel Vertical Derecho para Atributos */
+/* Panel Vertical Derecho para Atributos (Acercado al héroe) */
 .attributes-panel {
-    position: absolute; top: 100px; right: 40px; z-index: 10;
-    width: 220px; background: rgba(5, 5, 5, 0.9);
-    border: 2px solid transparent; border-image: linear-gradient(135deg, #ffd700, #ff0033) 1;
-    padding: 15px; display: flex; flex-direction: column;
-    box-shadow: 0 0 20px rgba(0,0,0,0.8);
-}
-.stat-row {
-    display: flex; justify-content: space-between; font-size: 12px; margin: 6px 0; color: #ccc;
-    border-bottom: 1px dashed #333; padding-bottom: 4px;
-}
-.stat-row span:last-child { color: #ffd700; font-weight: bold; }
-
-.creation-controls {
-    display: none; width: 100%; flex-direction: column; align-items: center; margin-top: 10px;
-    border-top: 1px solid #333; padding-top: 10px;
-}
-
-.btn-arrow {
-    position: absolute; z-index: 20; top: 50%; transform: translateY(-50%);
-    background: rgba(10, 10, 10, 0.7); border: 2px solid #ffd700; color: #ffd700;
-    font-size: 28px; font-weight: bold; width: 50px; height: 50px;
-    cursor: pointer; transition: all 0.3s; display: none; border-radius: 4px;
-}
-.btn-arrow:hover { background: #ff0033; color: #fff; box-shadow: 0 0 15px #ff0033; border-color: #ffd700; }
-.arrow-left { left: 80px; } 
-.arrow-right { right: 80px; } 
-
-.panel-top-name {
-    position: absolute; top: 30px; left: 50%; transform: translateX(-50%); z-index: 10;
-    background: rgba(5, 5, 5, 0.85); padding: 8px 30px; border: 2px solid transparent;
-    border-image: linear-gradient(135deg, #ffd700, #ff0033) 1; text-align: center; display: none;
-}
-.btn-large { font-size: 15px; padding: 12px; border-width: 2px; }
-.game-container { display: flex; flex-direction: column; align-items: center; }
-#mapCanvas { border: 3px solid transparent; border-image: linear-gradient(135deg, #ffd700, #ff0033) 1; }
-.hud { margin-top: 10px; font-size: 12px; color: #ffd700; text-align: center; line-height: 1.6; }
+    position: absolute; 
+    top: 18vh; 
+    right: 14vw; 
+    z-index: 10;
+    width: 210px; 
+    background:
