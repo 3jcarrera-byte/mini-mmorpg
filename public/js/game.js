@@ -1,3 +1,4 @@
+// public/js/game.js
 const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
@@ -259,6 +260,7 @@ const Game = {
     handleBuildClick(e) {
         if (e.button === 0) {
             const depth = e.shiftKey ? -1 : 0;
+            // Opcional: Lógica de construcción conectada al mundo esférico
         }
     },
 
@@ -275,14 +277,11 @@ const Game = {
             const obs = obstacles[i];
             if (!obs.position) continue;
 
-            // Distancia 3D desde la posición propuesta del jugador al objeto
             const dist = nextPos.distanceTo(obs.position);
             const obstacleRadius = obs.radius || 0.6;
             const obstacleHeight = obs.height || 1.2;
 
-            // Si está dentro del radio horizontal de choque
             if (dist < (playerRadius + obstacleRadius)) {
-                // Si la altitud del salto supera la altura del objeto, salta por encima limpiamente
                 if (currentAltitude < obstacleHeight) {
                     return true; // Colisión detectada (se bloquea el paso)
                 }
@@ -327,9 +326,9 @@ const Game = {
                 p.verticalVelocity = 0;
             }
 
-            // --- VISIBILIDAD DE MIRILLA EN TODAS LAS VISTAS (1ª, 3ª y RTS/Warcraft) ---
+            // --- VISIBILIDAD DE MIRILLA ---
             if (crosshair) {
-                crosshair.style.display = 'block'; // Mirilla siempre presente en todos los modos
+                crosshair.style.display = 'block';
                 
                 const scale = isMoving ? 'scale(1.3)' : 'scale(1)';
                 const posX = `calc(-50% + ${this.crosshairOffset.x}px)`;
@@ -355,10 +354,8 @@ const Game = {
                 tempForward.applyAxisAngle(axis, angle);
             }
 
-            // Normalizar y ajustar a la altitud actual
             targetPos.normalize().multiplyScalar(R + p.altitude);
 
-            // Verificar si el movimiento colisiona con obstáculos del mapa
             if (!this.checkCollision(targetPos, p.altitude)) {
                 p.position.copy(targetPos);
                 p.forward.copy(tempForward);
@@ -420,7 +417,6 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'rts') {
-                // Vista cenital / RTS Warcraft 3
                 const rtsHeight = 3.75;
                 const rtsBack = 2.0;
                 const camPos = p.position.clone()
@@ -429,7 +425,6 @@ const Game = {
 
                 this.camera.position.copy(camPos);
                 
-                // Alineación con dirección de apuntado
                 const lookDir = p.forward.clone();
                 lookDir.applyAxisAngle(right, p.pitch);
                 const targetLookAt = p.position.clone().add(lookDir.multiplyScalar(2.0));
