@@ -1,36 +1,45 @@
+// public/js/objects/tree.js
 const TreeObject = {
     create(position) {
         const group = new THREE.Group();
         
-        // Tronco y follaje
-        const trunkGeo = new THREE.CylinderGeometry(0.08, 0.1, 0.4, 5);
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513, flatShading: true });
+        // Tronco principal
+        const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.45, 6);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9, flatShading: true });
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-        trunk.position.y = 0.2;
+        trunk.position.y = 0.22;
         group.add(trunk);
 
-        const leavesGeo = new THREE.ConeGeometry(0.25, 0.6, 5);
-        const leavesMat = new THREE.MeshStandardMaterial({ color: 0x0b6623, flatShading: true });
-        const leaves = new THREE.Mesh(leavesGeo, leavesMat);
-        leaves.position.y = 0.5;
-        group.add(leaves);
+        // Copas de follaje multicapa (efecto pino / árbol frondoso low-poly)
+        const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d8a39, roughness: 0.7, flatShading: true });
+        
+        const layer1 = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.45, 5), leavesMat);
+        layer1.position.y = 0.45;
+        group.add(layer1);
 
+        const layer2 = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.35, 5), leavesMat);
+        layer2.position.y = 0.7;
+        group.add(layer2);
+
+        const layer3 = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.25, 5), leavesMat);
+        layer3.position.y = 0.9;
+        group.add(layer3);
+
+        // Orientación sobre la esfera del planeta
         group.position.copy(position);
         group.lookAt(0, 0, 0);
         group.rotateX(Math.PI / 2);
-        
-        // Elevar levemente para alinear con la superficie
         group.position.addScaledVector(group.position.clone().normalize(), 0.05);
 
         return {
             mesh: group,
             collider: {
                 position: group.position.clone(),
-                radius: 0.18, // Radio compacto
-                height: 0.5
+                radius: 0.22, // Radio de colisión optimizado al tronco
+                height: 0.6
             },
             resourceType: 'wood',
-            resourceAmount: 10
+            resourceAmount: 15
         };
     }
 };
