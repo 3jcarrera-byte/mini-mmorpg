@@ -125,6 +125,21 @@ button.arrow-right { right: 22vw !important; }
     background: rgba(5, 5, 5, 0.85); padding: 8px 30px; border: 2px solid transparent;
     border-image: linear-gradient(135deg, #ffd700, #ff0033) 1; text-align: center; display: none;
 }
+
+/* Capa oscura superpuesta para el modal de borrado */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .btn-large { font-size: 15px; padding: 12px; border-width: 2px; }
 .game-container { display: flex; flex-direction: column; align-items: center; }
 #mapCanvas { border: 3px solid transparent; border-image: linear-gradient(135deg, #ffd700, #ff0033) 1; }
