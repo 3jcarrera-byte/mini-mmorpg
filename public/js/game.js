@@ -91,7 +91,7 @@ const Game = {
 
         canvas.addEventListener('contextmenu', e => e.preventDefault());
         
-        // Activar Pointer Lock al hacer clic en el canvas para controlar la cámara con el mouse estilo shooter
+        // Activar Pointer Lock al hacer clic para girar la cámara con el mouse
         canvas.addEventListener('click', () => {
             canvas.requestPointerLock();
         });
@@ -175,7 +175,7 @@ const Game = {
         if (this.localPlayer.mesh) {
             const p = this.localPlayer;
 
-            // --- LÓGICA DE MOVIMIENTO WASD (DESPLAZAMIENTO PURO) ---
+            // --- LÓGICA DE MOVIMIENTO WASD (CORREGIDA PARA STRAFE LIMPIO) ---
             let moveForward = 0;
             let moveSide = 0;
 
@@ -186,9 +186,9 @@ const Game = {
 
             if (moveForward !== 0 || moveSide !== 0) {
                 const R = this.planetRadius;
-                // Cálculo vectorial de movimiento sobre la superficie esférica basado en la dirección del mouse (heading)
-                const deltaTheta = (moveForward * Math.sin(p.heading) + moveSide * Math.cos(p.heading)) / R;
-                const deltaPhi   = (-moveForward * Math.cos(p.heading) + moveSide * Math.sin(p.heading)) / R;
+                // Corrección matemática exacta de los senos y cosenos para el movimiento lateral sobre la esfera
+                const deltaTheta = (moveForward * Math.sin(p.heading) - moveSide * Math.cos(p.heading)) / R;
+                const deltaPhi   = (-moveForward * Math.cos(p.heading) - moveSide * Math.sin(p.heading)) / R;
 
                 p.theta += deltaTheta;
                 p.phi += deltaPhi;
