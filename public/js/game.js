@@ -14,7 +14,7 @@ const Game = {
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
-        weaponRange: 15.0 // Alcance máximo configurable del arma
+        weaponRange: 15.0 
     },
     remotePlayers: {},
     keys: {},
@@ -22,6 +22,7 @@ const Game = {
     planetRadius: 5.0,
     gravity: 0.004,
     cameraMode: 'first', // 'first', 'third', 'rts'
+    isAiming: false,      // Estado de apuntado en tercera persona
 
     start(characterData) {
         if (characterData) {
@@ -118,6 +119,21 @@ const Game = {
             canvas.requestPointerLock();
         });
 
+        // Control de Clic Derecho para Apuntar en Tercera Persona
+        canvas.addEventListener('mousedown', e => {
+            if (e.button === 2) { // Clic derecho
+                this.isAiming = true;
+            } else {
+                this.handleBuildClick(e);
+            }
+        });
+
+        canvas.addEventListener('mouseup', e => {
+            if (e.button === 2) {
+                this.isAiming = false;
+            }
+        });
+
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.0025;
@@ -133,8 +149,6 @@ const Game = {
                 this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
             }
         });
-
-        canvas.addEventListener('mousedown', e => this.handleBuildClick(e));
     },
 
     createShooterCrosshair() {
@@ -151,17 +165,15 @@ const Game = {
             crosshair.style.pointerEvents = 'none';
             crosshair.style.zIndex = '100';
 
-            // Estilo de líneas de la mirilla de shooter (Cruz + Punto central)
             const lines = [
-                { top: '10px', left: '0px', width: '8px', height: '2px' },  // Izquierda
-                { top: '10px', left: '16px', width: '8px', height: '2px' }, // Derecha
-                { top: '0px', left: '10px', width: '2px', height: '8px' },  // Arriba
-                { top: '16px', left: '10px', width: '2px', height: '8px' }   // Abajo
+                { top: '10px', left: '0px', width: '8px', height: '2px' },  
+                { top: '10px', left: '16px', width: '8px', height: '2px' }, 
+                { top: '0px', left: '10px', width: '2px', height: '8px' },  
+                { top: '16px', left: '10px', width: '2px', height: '8px' }   
             ];
 
             lines.forEach(cfg => {
                 const line = document.createElement('div');
-                line.className = 'crosshair-line';
                 line.style.position = 'absolute';
                 line.style.top = cfg.top;
                 line.style.left = cfg.left;
@@ -172,7 +184,6 @@ const Game = {
                 crosshair.appendChild(line);
             });
 
-            // Punto central
             const dot = document.createElement('div');
             dot.style.position = 'absolute';
             dot.style.top = '11px';
@@ -257,14 +268,14 @@ const Game = {
                 p.verticalVelocity = 0;
             }
 
-            // Animación dinámica de dispersión de la mirilla al movernos
+            // Gestionar visibilidad y dispersión de la mirilla (visible en 1era persona o al apuntar en 3era)
             if (crosshair) {
-                if (this.cameraMode === 'first') {
-                    crosshair.style.display = 'block';
+                const showCrosshair = (this.cameraMode === 'first' || (this.cameraMode === 'third' && this.isAiming));
+                crosshair.style.display = showCrosshair ? 'block' : 'none';
+                
+                if (showCrosshair) {
                     const scale = isMoving ? 'scale(1.3)' : 'scale(1)';
                     crosshair.style.transform = `translate(-50%, -50%) ${scale}`;
-                } else {
-                    crosshair.style.display = 'none';
                 }
             }
 
@@ -276,7 +287,6 @@ const Game = {
             }
 
             if (moveSide !== 0) {
-                // Movimiento lateral estricto sobre la circunferencia del meridiano/paralelo local
                 const axis = new THREE.Vector3().crossVectors(normal, right).normalize();
                 const angle = moveSide / R;
                 p.position.applyAxisAngle(axis, angle);
@@ -297,7 +307,7 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS Y ALCANCE MÁXIMO ADAPTADO A LA TIERRA ---
+            // --- GESTIÓN DE CÁMARAS Y APUNTADO ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
@@ -311,29 +321,45 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'third') {
-                // Tercera persona con radio orbital acoplado a la curvatura de la tierra
-                const distanceBack = Math.min(3.5, p.weaponRange * 0.4);
-                const heightUp = 1.6;
-                
-                // Posición orbital respetando la curvatura esférica
+                // Tercera persona dinámica: si haces clic derecho (isAiming) pasa a modo over-the-shoulder para apuntar
+                let distanceBack = 3.5;
+                let heightUp = 1.6;
+                let rightOffset = 0.0;
+
+                if (this.isAiming) {
+                    distanceBack = 2.0;
+                    heightUp = 1.4;
+                    rightOffset = 0.6; // Desplazamiento sobre el hombro derecho para apuntar con la mirilla
+                }
+
+                const shoulderOffset = right.clone().multiplyScalar(rightOffset);
                 const camPos = p.position.clone()
+                    .add(shoulderOffset)
                     .add(normal.clone().multiplyScalar(heightUp))
                     .sub(p.forward.clone().multiplyScalar(distanceBack));
                 
-                // Asegurar que la cámara respete la curvatura y no atraviese el suelo
                 const camNormal = camPos.clone().normalize();
                 if (camPos.length() < R + 0.5) {
                     camPos.copy(camNormal.multiplyScalar(R + 0.5));
                 }
 
                 this.camera.position.copy(camPos);
-                const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.6));
-                this.camera.lookAt(targetLookAt);
+
+                if (this.isAiming) {
+                    // Si apunta, la cámara se alinea al vector de disparo con el pitch del mouse
+                    const lookDir = p.forward.clone();
+                    lookDir.applyAxisAngle(right, p.pitch);
+                    const targetLookAt = camPos.clone().add(lookDir.multiplyScalar(p.weaponRange));
+                    this.camera.lookAt(targetLookAt);
+                } else {
+                    const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.6));
+                    this.camera.lookAt(targetLookAt);
+                }
 
             } else if (this.cameraMode === 'rts') {
-                // Vista cenital / RTS Warcraft 3 adaptada a la esfera
-                const rtsHeight = 7.5;
-                const rtsBack = 4.0;
+                // Vista cenital / RTS Warcraft 3 reducida a la mitad de la distancia anterior
+                const rtsHeight = 3.75; // Reducido de 7.5 a la mitad
+                const rtsBack = 2.0;    // Reducido de 4.0 a la mitad
                 const camPos = p.position.clone()
                     .add(normal.clone().multiplyScalar(rtsHeight))
                     .sub(p.forward.clone().multiplyScalar(rtsBack));
