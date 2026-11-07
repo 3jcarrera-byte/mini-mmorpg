@@ -4,7 +4,7 @@ const WorldModule = (() => {
     let playerPos = { theta: 0, phi: Math.PI / 2 };
     const planetRadius = 5;
     const structures = [];
-    const obstacles = []; // <--- Almacén global de obstáculos para colisiones
+    const obstacles = []; // Almacén global de obstáculos para colisiones
     const textureLoader = new THREE.TextureLoader();
 
     function createPlanet(scene, worldConfig = {}) {
@@ -59,11 +59,11 @@ const WorldModule = (() => {
 
             scene.add(mesh);
 
-            // <--- REGISTRAR CADA ÁRBOL Y ROCA COMO OBSTÁCULO SÓLIDO --->
+            // Registrar cada árbol y roca con radio ajustado y preciso
             obstacles.push({
                 position: mesh.position.clone(),
-                radius: 0.45,   // Radio de colisión horizontal
-                height: 0.7     // Altura que se puede saltar
+                radius: 0.22,   // Radio de colisión horizontal ajustado al cuerpo
+                height: 0.6     // Altura que se puede saltar
             });
         }
     }
@@ -89,10 +89,10 @@ const WorldModule = (() => {
         scene.add(structureMesh);
         structures.push(structureMesh);
 
-        // Registrar estructura construida como obstáculo
+        // Registrar estructura construida como obstáculo con radio preciso
         obstacles.push({
             position: structureMesh.position.clone(),
-            radius: 0.5,
+            radius: 0.3,
             height: 0.4
         });
     }
@@ -129,7 +129,7 @@ const WorldModule = (() => {
         updatePlayerOnSphere,
         rotatePlanet,
         getRadius: () => planetRadius,
-        getObstacles: () => obstacles // <--- EXPONE LOS OBSTÁCULOS AL JUEGO
+        getObstacles: () => obstacles
     };
 })();
 
