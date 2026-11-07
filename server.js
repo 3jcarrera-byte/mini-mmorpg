@@ -39,6 +39,9 @@ io.on('connection', (socket) => {
 
     // Registro
     socket.on('auth:register', ({ username, email, password }, callback) => {
+        if (!username || !email || !password) {
+            return callback({ success: false, message: 'Completa todos los campos.' });
+        }
         if (usersDB[username]) {
             return callback({ success: false, message: 'El usuario ya existe.' });
         }
@@ -50,8 +53,9 @@ io.on('connection', (socket) => {
     // Crear Personaje
     socket.on('character:create', ({ name, classType }, callback) => {
         if (!currentUser) return callback({ success: false, message: 'No autenticado.' });
+        if (!name || !name.trim()) return callback({ success: false, message: 'Nombre de héroe inválido.' });
 
-        const newChar = { id: Date.now(), name, classType, level: 1, hp: 100 };
+        const newChar = { id: Date.now(), name: name.trim(), classType: classType || 'guerrero', level: 1, hp: 100 };
         charactersDB[currentUser].push(newChar);
 
         callback({ success: true, characters: charactersDB[currentUser] });
