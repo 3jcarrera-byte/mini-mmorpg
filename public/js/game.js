@@ -22,7 +22,11 @@ const Game = {
     planetRadius: 5.0,
     gravity: 0.004,
     cameraMode: 'first', // 'first', 'third', 'rts'
-    isAiming: false,      // Estado de apuntado en tercera persona
+    isAiming: false,
+    
+    // --- ESTADO DE MIRILLA EN TERCERA PERSONA ---
+    crosshairOffset: { x: 0, y: 0 },
+    maxCrosshairRadius: 120, // Radio máximo en píxeles que la mira se aleja del centro
 
     start(characterData) {
         if (characterData) {
@@ -107,6 +111,9 @@ const Game = {
                 } else {
                     this.cameraMode = 'first';
                 }
+                // Resetear offset de mirilla al cambiar de modo
+                this.crosshairOffset.x = 0;
+                this.crosshairOffset.y = 0;
             }
         });
 
@@ -119,9 +126,9 @@ const Game = {
             canvas.requestPointerLock();
         });
 
-        // Control de Clic Derecho para Apuntar en Tercera Persona
+        // Control de Clic Derecho para Apuntar
         canvas.addEventListener('mousedown', e => {
-            if (e.button === 2) { // Clic derecho
+            if (e.button === 2) { 
                 this.isAiming = true;
             } else {
                 this.handleBuildClick(e);
@@ -139,14 +146,42 @@ const Game = {
                 const sensitivity = 0.0025;
                 const normal = this.localPlayer.position.clone().normalize();
                 
-                // Rotar el vector forward alrededor de la normal local (Yaw)
-                const yawDelta = -e.movementX * sensitivity;
-                this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
-                this.localPlayer.forward.normalize();
+                if (this.cameraMode === 'third' && !this.isAiming) {
+                    // --- MOVIMIENTO LIBRE DE MIRILLA DENTRO DEL RADIO DE APUNTADO ---
+                    this.crosshairOffset.x += e.movementX;
+                    this.crosshairOffset.y += e.movementY;
 
-                // Pitch (Inclinación vertical)
-                this.localPlayer.pitch -= e.movementY * sensitivity;
-                this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
+                    // Calcular la distancia desde el centro
+                    const dist = Math.hypot(this.crosshairOffset.x, this.crosshairOffset.y);
+
+                    // Si supera el radio máximo, rotamos la orientación del jugador y limitamos el vector
+                    if (dist > this.maxCrosshairRadius) {
+                        const overflowX = (this.crosshairOffset.x / dist) * (dist - this.maxCrosshairRadius);
+                        const overflowY = (this.crosshairOffset.y / dist) * (dist - this.maxCrosshairRadius);
+
+                        const yawDelta = -overflowX * sensitivity;
+                        this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
+                        this.localPlayer.forward.normalize();
+
+                        this.localPlayer.pitch -= overflowY * sensitivity;
+                        this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
+
+                        // Clampear desplazamiento al radio máximo
+                        this.crosshairOffset.x = (this.crosshairOffset.x / dist) * this.maxCrosshairRadius;
+                        this.crosshairOffset.y = (this.crosshairOffset.y / dist) * this.maxCrosshairRadius;
+                    }
+                } else {
+                    // Control directo estándar en 1ª Persona o al mantener clic derecho en 3ª Persona
+                    this.crosshairOffset.x = 0;
+                    this.crosshairOffset.y = 0;
+
+                    const yawDelta = -e.movementX * sensitivity;
+                    this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
+                    this.localPlayer.forward.normalize();
+
+                    this.localPlayer.pitch -= e.movementY * sensitivity;
+                    this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
+                }
             }
         });
     },
@@ -268,14 +303,17 @@ const Game = {
                 p.verticalVelocity = 0;
             }
 
-            // Gestionar visibilidad y dispersión de la mirilla (visible en 1era persona o al apuntar en 3era)
+            // --- GESTIÓN DE MIRILLA (MISMA MIRA EN 1ª Y 3ª PERSONA) ---
             if (crosshair) {
-                const showCrosshair = (this.cameraMode === 'first' || (this.cameraMode === 'third' && this.isAiming));
+                const showCrosshair = (this.cameraMode === 'first' || this.cameraMode === 'third');
                 crosshair.style.display = showCrosshair ? 'block' : 'none';
                 
                 if (showCrosshair) {
                     const scale = isMoving ? 'scale(1.3)' : 'scale(1)';
-                    crosshair.style.transform = `translate(-50%, -50%) ${scale}`;
+                    // En 3era persona aplica el offset dinámico del mouse dentro del radio
+                    const posX = `calc(-50% + ${this.crosshairOffset.x}px)`;
+                    const posY = `calc(-50% + ${this.crosshairOffset.y}px)`;
+                    crosshair.style.transform = `translate(${posX}, ${posY}) ${scale}`;
                 }
             }
 
@@ -307,7 +345,7 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS Y APUNTADO ---
+            // --- GESTIÓN DE CÁMARAS Y DIRECCIÓN ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
@@ -321,7 +359,6 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'third') {
-                // Tercera persona dinámica: si haces clic derecho (isAiming) pasa a modo over-the-shoulder para apuntar
                 let distanceBack = 3.5;
                 let heightUp = 1.6;
                 let rightOffset = 0.0;
@@ -329,7 +366,7 @@ const Game = {
                 if (this.isAiming) {
                     distanceBack = 2.0;
                     heightUp = 1.4;
-                    rightOffset = 0.6; // Desplazamiento sobre el hombro derecho para apuntar con la mirilla
+                    rightOffset = 0.6;
                 }
 
                 const shoulderOffset = right.clone().multiplyScalar(rightOffset);
@@ -345,21 +382,14 @@ const Game = {
 
                 this.camera.position.copy(camPos);
 
-                if (this.isAiming) {
-                    // Si apunta, la cámara se alinea al vector de disparo con el pitch del mouse
-                    const lookDir = p.forward.clone();
-                    lookDir.applyAxisAngle(right, p.pitch);
-                    const targetLookAt = camPos.clone().add(lookDir.multiplyScalar(p.weaponRange));
-                    this.camera.lookAt(targetLookAt);
-                } else {
-                    const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.6));
-                    this.camera.lookAt(targetLookAt);
-                }
+                const lookDir = p.forward.clone();
+                lookDir.applyAxisAngle(right, p.pitch);
+                const targetLookAt = camPos.clone().add(lookDir.multiplyScalar(p.weaponRange));
+                this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'rts') {
-                // Vista cenital / RTS Warcraft 3 reducida a la mitad de la distancia anterior
-                const rtsHeight = 3.75; // Reducido de 7.5 a la mitad
-                const rtsBack = 2.0;    // Reducido de 4.0 a la mitad
+                const rtsHeight = 3.75;
+                const rtsBack = 2.0;
                 const camPos = p.position.clone()
                     .add(normal.clone().multiplyScalar(rtsHeight))
                     .sub(p.forward.clone().multiplyScalar(rtsBack));
