@@ -34,6 +34,17 @@ button:hover {
 .btn-secondary { background-color: #000; border-color: #444; color: #888; }
 .btn-secondary:hover { background-color: #1a1a1a; border-color: #888; color: #fff; box-shadow: none; }
 
+.btn-danger {
+    background-color: #330000 !important;
+    border-color: #ff0033 !important;
+    color: #ff4444 !important;
+}
+.btn-danger:hover {
+    background-color: #990000 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.6) !important;
+}
+
 .full-cinematic { 
     position: relative; width: 100vw; height: 100vh; background-color: transparent !important; 
 }
@@ -51,13 +62,13 @@ button:hover {
     box-shadow: 0 0 25px rgba(0,0,0,0.9);
 }
 
-/* Panel Vertical Derecho para Atributos */
+/* Panel Vertical Derecho para Atributos (Desplazado para no chocar con la flecha) */
 .attributes-panel {
     position: absolute; 
-    top: 22vh; 
-    right: 15vw; 
+    top: 20vh; 
+    right: 5vw !important; 
     z-index: 10;
-    width: 220px !important; 
+    width: 200px !important; 
     background: rgba(5, 5, 5, 0.92);
     border: 2px solid transparent; 
     border-image: linear-gradient(135deg, #ffd700, #ff0033) 1;
@@ -85,7 +96,7 @@ button:hover {
     border-top: 1px solid #333; padding-top: 10px;
 }
 
-/* Botones de flechas compactos (Forzados para evitar que tomen el 100% del width global) */
+/* Botones de flechas compactos (Separados de los atributos y del centro) */
 button.btn-arrow {
     position: absolute !important; 
     z-index: 20 !important; 
@@ -106,8 +117,8 @@ button.btn-arrow {
     border-radius: 4px !important;
 }
 button.btn-arrow:hover { background: #ff0033 !important; color: #fff !important; box-shadow: 0 0 15px #ff0033 !important; }
-button.arrow-left { left: 28vw !important; } 
-button.arrow-right { right: 28vw !important; } 
+button.arrow-left { left: 22vw !important; } 
+button.arrow-right { right: 22vw !important; } 
 
 .panel-top-name {
     position: absolute; top: 30px; left: 50%; transform: translateX(-50%); z-index: 10;
