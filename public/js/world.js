@@ -26,7 +26,7 @@ const WorldModule = (() => {
         return planetMesh;
     }
 
-    // --- DISEÑO DETALLADO Y DINÁMICO DE ÁRBOLES (CON CRECIMIENTO DE 1 MIN Y ANTISOLAPAMIENTO) ---
+    // --- DISEÑO DETALLADO Y DINÁMICO DE ÁRBOLES (CON CRECIMIENTO ACTIVO Y ANTISOLAPAMIENTO) ---
     function createDetailedTree(position, initialState = 'adult', initialProgress = 1.0) {
         const group = new THREE.Group();
         
@@ -76,9 +76,8 @@ const WorldModule = (() => {
             seedTimer: 0,
 
             update(delta, scene, obstaclesList, allObjectsList) {
-                // 1. Crecimiento rápido de brote a adulto en exactamente 60 segundos (1 min)
+                // 1. Crecimiento activo de brote a adulto en 60 segundos (1 min)
                 if (this.state === 'sapling') {
-                    // delta / 60 segundos -> de 0 a 1 en un minuto exacto
                     this.growthProgress += delta / 60.0; 
                     if (this.growthProgress >= 1.0) {
                         this.growthProgress = 1.0;
@@ -90,7 +89,7 @@ const WorldModule = (() => {
                     return;
                 }
 
-                // 2. Generación de semillas periódicas en árboles adultos (cada ~30s para pruebas)
+                // 2. Generación de semillas periódicas en árboles adultos (cada ~30s)
                 if (this.state === 'adult') {
                     this.seedTimer += delta;
                     if (this.seedTimer > 30) { 
@@ -128,7 +127,6 @@ const WorldModule = (() => {
             },
 
             trySpawnSeed(scene, obstaclesList, allObjectsList) {
-                // Intentar buscar una posición cercana que NO esté ocupada por otro objeto
                 let newPos = null;
                 let validPositionFound = false;
 
@@ -138,7 +136,6 @@ const WorldModule = (() => {
                     
                     const testPos = group.position.clone().add(new THREE.Vector3(offsetTheta, 0, offsetPhi)).normalize().multiplyScalar(planetRadius);
 
-                    // Verificar distancia mínima con todos los demás objetos existentes (evita que se monten)
                     let tooClose = false;
                     for (let i = 0; i < allObjectsList.length; i++) {
                         if (allObjectsList[i].mesh && allObjectsList[i].mesh.position.distanceTo(testPos) < 0.6) {
@@ -154,7 +151,6 @@ const WorldModule = (() => {
                     }
                 }
 
-                // Si encontró un espacio libre cercano, genera el brote
                 if (validPositionFound && newPos) {
                     const newTree = createDetailedTree(newPos, 'sapling', 0.1);
                     newTree.mesh.scale.setScalar(0.1);
@@ -206,7 +202,6 @@ const WorldModule = (() => {
     }
 
     function generateFeatures(scene, trees, rocks) {
-        // Generar con comprobación de espacio para evitar que nazcan solapados al iniciar el mundo
         const generatedPositions = [];
 
         for (let i = 0; i < (trees + rocks); i++) {
@@ -227,7 +222,7 @@ const WorldModule = (() => {
 
                 valid = true;
                 for (let p of generatedPositions) {
-                    if (p.distanceTo(position) < 0.5) { // Distancia mínima de separación inicial
+                    if (p.distanceTo(position) < 0.5) {
                         valid = false;
                         break;
                     }
@@ -238,7 +233,15 @@ const WorldModule = (() => {
             generatedPositions.push(position);
 
             const isTree = i < trees;
-            const featureData = isTree ? createDetailedTree(position, 'adult', 1.0) : createDetailedRock(position);
+            let featureData;
+            if (isTree) {
+                // Mezcla inicial: 50% adultos y 50% brotes (saplings) con progreso aleatorio para verlos crecer inmediatamente
+                const randomState = Math.random() < 0.5 ? 'sapling' : 'adult';
+                const randomProgress = randomState === 'sapling' ? Math.random() * 0.6 + 0.2 : 1.0;
+                featureData = createDetailedTree(position, randomState, randomProgress);
+            } else {
+                featureData = createDetailedRock(position);
+            }
 
             if (featureData) {
                 if (featureData.mesh) scene.add(featureData.mesh);
