@@ -1,38 +1,16 @@
-// Motor 3D de Selección y Creación - Proporciones Consistentes y Atributos Escalables
+// Motor 3D de Selección y Creación - Limpieza de Escena y Control Estricto de Visibilidad
 const CharacterModule = (() => {
     let scene, camera, renderer;
     let characterMeshes = []; 
     let classCreationMeshes = {}; 
-    let selectedCharacterData = null;
     let isCreationMode = false;
     let currentClassIndex = 0;
+    let currentUserCharIndex = 0;
 
-    // Clases con proporciones visuales definidas (radio, altura del cuerpo y atributos base)
     const classes = [
-        { 
-            id: 'guerrero', 
-            name: 'Guerrero', 
-            color: 0xff0033, 
-            radius: 0.32, 
-            height: 1.1, 
-            stats: { str: 15, def: 12, spd: 8, agi: 7, mana: 5 } 
-        },
-        { 
-            id: 'mago', 
-            name: 'Mago', 
-            color: 0x0088ff, 
-            radius: 0.28, 
-            height: 1.15, 
-            stats: { str: 5, def: 6, spd: 10, agi: 8, mana: 20 } 
-        },
-        { 
-            id: 'arquero', 
-            name: 'Arquero', 
-            color: 0x00ff66, 
-            radius: 0.26, 
-            height: 1.12, 
-            stats: { str: 8, def: 8, spd: 14, agi: 15, mana: 10 } 
-        }
+        { id: 'guerrero', name: 'Guerrero', color: 0xff0033, radius: 0.32, height: 1.1, stats: { str: 15, def: 12, spd: 8, agi: 7, mana: 5 } },
+        { id: 'mago', name: 'Mago', color: 0x0088ff, radius: 0.28, height: 1.15, stats: { str: 5, def: 6, spd: 10, agi: 8, mana: 20 } },
+        { id: 'arquero', name: 'Arquero', color: 0x00ff66, radius: 0.26, height: 1.12, stats: { str: 8, def: 8, spd: 14, agi: 15, mana: 10 } }
     ];
 
     function init3D() {
@@ -50,7 +28,6 @@ const CharacterModule = (() => {
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
 
-        // Iluminación
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
@@ -65,7 +42,7 @@ const CharacterModule = (() => {
         floor.position.y = 0.5;
         scene.add(floor);
 
-        // Inicializar mallas de creación por clase respetando sus proporciones
+        // Mallas para creación de clases (Inicialmente ocultas)
         classes.forEach((c) => {
             const group = createCharacterMesh(c.color, `${c.name.toUpperCase()}`, c.radius, c.height);
             group.position.set(0, 0.6, 0);
@@ -79,27 +56,24 @@ const CharacterModule = (() => {
         animate();
     }
 
-    // Crea el avatar con proporciones limpias y evita que el texto se encime con la cabeza
     function createCharacterMesh(colorHex, labelText, radius = 0.3, height = 1.1) {
         const group = new THREE.Group();
         
-        // Cuerpo proporcional
         const bodyGeo = new THREE.CylinderGeometry(radius, radius, height, 16);
         const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
         const body = new THREE.Mesh(bodyGeo, bodyMat);
         body.position.y = height / 2;
         group.add(body);
 
-        // Cabeza colocada exactamente arriba del cuerpo sin solaparse
         const headGeo = new THREE.SphereGeometry(0.2, 16, 16);
         const headMat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
         const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = height + 0.25;
+        head.position.y = height + 0.22;
         group.add(head);
 
-        // Etiqueta flotante muy por encima de la cabeza para evitar atropellos visuales
+        // Posicionar sprite para evitar superposición con el texto de la clase
         const labelSprite = createTransparentTextSprite(labelText);
-        labelSprite.position.set(0, height + 0.65, 0);
+        labelSprite.position.set(0, height + 0.6, 0);
         group.add(labelSprite);
 
         return group;
@@ -127,7 +101,6 @@ const CharacterModule = (() => {
         return sprite;
     }
 
-    // Calcula atributos finales sumando nivel, equipo y efectos de estado
     function calculateFinalStats(baseStats, level = 1, equipment = {}, statusEffects = []) {
         let stats = {
             str: baseStats.str + (level - 1) * 2,
@@ -137,7 +110,6 @@ const CharacterModule = (() => {
             mana: baseStats.mana + (level - 1) * 2
         };
 
-        // Sumar bonificadores de equipamiento (si los tiene)
         if (equipment) {
             if (equipment.str) stats.str += equipment.str;
             if (equipment.def) stats.def += equipment.def;
@@ -146,7 +118,6 @@ const CharacterModule = (() => {
             if (equipment.mana) stats.mana += equipment.mana;
         }
 
-        // Aplicar efectos de estado activos (Buffs / Debuffs porcentuales o planos)
         if (Array.isArray(statusEffects)) {
             statusEffects.forEach(effect => {
                 if (effect.type === 'buff_str') stats.str += effect.value;
@@ -154,7 +125,6 @@ const CharacterModule = (() => {
             });
         }
 
-        // Retornar valores redondeados
         return {
             str: Math.round(stats.str),
             def: Math.round(stats.def),
@@ -164,6 +134,7 @@ const CharacterModule = (() => {
         };
     }
 
+    // Remueve y destruye de forma segura mallas anteriores para evitar solapamientos 3D
     function renderUserCharacters3D(characterList) {
         characterMeshes.forEach(m => scene.remove(m));
         characterMeshes = [];
@@ -186,23 +157,22 @@ const CharacterModule = (() => {
         }
     }
 
-    let currentUserCharIndex = 0;
     function showUserCharacter(index) {
         if (characterMeshes.length === 0) return;
         currentUserCharIndex = (index + characterMeshes.length) % characterMeshes.length;
         
+        // Garantizar que solo un personaje sea visible a la vez
         characterMeshes.forEach((m, idx) => {
-            m.visible = (idx === currentUserCharIndex);
+            m.visible = (idx === currentUserCharIndex && !isCreationMode);
         });
 
         const activeChar = characterMeshes[currentUserCharIndex].userData;
-        
-        // Si estamos mostrando un personaje existente, calculamos y mostramos sus atributos reales
-        if (activeChar) {
+        if (activeChar && !isCreationMode) {
             const baseClass = classes.find(c => c.id === activeChar.classType) || classes[0];
             const finalStats = calculateFinalStats(baseClass.stats, activeChar.level || 1, activeChar.equipment, activeChar.statusEffects);
             
-            if (document.getElementById('stat-str')) {
+            const strEl = document.getElementById('stat-str');
+            if (strEl) {
                 document.getElementById('stat-str').innerText = finalStats.str;
                 document.getElementById('stat-def').innerText = finalStats.def;
                 document.getElementById('stat-spd').innerText = finalStats.spd;
@@ -225,6 +195,8 @@ const CharacterModule = (() => {
 
     function setCreationMode(active) {
         isCreationMode = active;
+
+        // Ocultar mallas de personajes existentes si entramos a modo creación
         characterMeshes.forEach(m => m.visible = false);
 
         const topName = document.getElementById('panel-top-name');
@@ -244,9 +216,11 @@ const CharacterModule = (() => {
             camera.lookAt(0, 1.2, 0);
             focusClass(0);
         } else {
+            // Ocultar mallas de clase al salir de modo creación
+            Object.keys(classCreationMeshes).forEach(k => classCreationMeshes[k].visible = false);
             camera.position.set(0, 2.2, 5.2);
             camera.lookAt(0, 1.0, 0);
-            if (characterMeshes.length > 0) showUserCharacter(0);
+            if (characterMeshes.length > 0) showUserCharacter(currentUserCharIndex);
         }
     }
 
@@ -255,13 +229,12 @@ const CharacterModule = (() => {
         const targetClass = classes[currentClassIndex];
         
         Object.keys(classCreationMeshes).forEach(key => {
-            classCreationMeshes[key].visible = (key === targetClass.id);
+            classCreationMeshes[key].visible = (key === targetClass.id && isCreationMode);
         });
 
         const nameEl = document.getElementById('char-display-name');
         if (nameEl) nameEl.innerText = `CLASE: ${targetClass.name.toUpperCase()}`;
 
-        // Al crear, mostramos los stats base de nivel 1 con el método escalable
         const finalStats = calculateFinalStats(targetClass.stats, 1, {}, []);
         document.getElementById('stat-str').innerText = finalStats.str;
         document.getElementById('stat-def').innerText = finalStats.def;
@@ -274,10 +247,13 @@ const CharacterModule = (() => {
 
     function animate() {
         requestAnimationFrame(animate);
-        characterMeshes.forEach(m => { if(m.visible) m.rotation.y += 0.008; });
-        Object.keys(classCreationMeshes).forEach(k => {
-            if (classCreationMeshes[k].visible) classCreationMeshes[k].rotation.y += 0.01;
-        });
+        if (!isCreationMode) {
+            characterMeshes.forEach(m => { if(m.visible) m.rotation.y += 0.008; });
+        } else {
+            Object.keys(classCreationMeshes).forEach(k => {
+                if (classCreationMeshes[k].visible) classCreationMeshes[k].rotation.y += 0.01;
+            });
+        }
         if (renderer && scene && camera) renderer.render(scene, camera);
     }
 
@@ -294,6 +270,7 @@ const CharacterModule = (() => {
         setCreationMode,
         calculateFinalStats,
         getCurrentClass: () => classes[currentClassIndex],
+        getSelectedCharacter: () => characterMeshes[currentUserCharIndex] ? characterMeshes[currentUserCharIndex].userData : null,
         nextClass: () => {
             if (isCreationMode) focusClass(currentClassIndex + 1);
             else showUserCharacter(currentUserCharIndex + 1);
