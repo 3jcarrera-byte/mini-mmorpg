@@ -1,3 +1,4 @@
+
 document.addEventListener('DOMContentLoaded', () => {
     const socket = io();
     let selectedCharacter = null;
@@ -15,12 +16,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 1. PANTALLA LOGIN ---
     document.getElementById('btn-login').addEventListener('click', () => {
         const user = document.getElementById('login-username').value.trim();
-        if (!user) return alert('Ingresa un usuario');
+        const pass = document.getElementById('login-password').value;
 
-        // Notificar al servidor el inicio de sesión
-        socket.emit('auth:login', { username: user }, (response) => {
+        if (!user || !pass) return alert('Ingresa usuario y contraseña');
+
+        // Notificar al servidor el inicio de sesión enviando usuario y clave
+        socket.emit('auth:login', { username: user, password: pass }, (response) => {
             if (response.success) {
-                renderCharacterList(response.characters);
+                renderCharacterSlots(response.characters);
                 showScreen('screen-character');
             } else {
                 alert(response.message || 'Error de autenticación');
@@ -56,7 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = document.getElementById('forgot-email').value.trim();
         if (!email) return alert('Ingresa tu correo registrado.');
 
-        // Enviar correo mediante mailto al soporte técnico
         const subject = encodeURIComponent('Recuperación de Contraseña - Mini MMORPG');
         const body = encodeURIComponent(`Hola Soporte Técnico,\n\nSolicito la recuperación de contraseña para la cuenta vinculada al correo: ${email}`);
         window.location.href = `mailto:soporte@minimmorpg.com?subject=${subject}&body=${body}`;
@@ -67,21 +69,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-forgot-to-login').addEventListener('click', () => showScreen('screen-login'));
 
-    // --- 4. CREACIÓN Y SELECCIÓN DE PERSONAJES ---
+    // --- 4. CREACIÓN Y SELECCIÓN DE PERSONAJES (ESTILO MU) ---
     document.getElementById('btn-to-create').addEventListener('click', () => {
-        document.getElementById('panel-create-controls').style.display = 'block';
-        document.getElementById('btn-arrow-left').style.display = 'block';
-        document.getElementById('btn-arrow-right').style.display = 'block';
+        document.getElementById('panel-create-controls').style.display = 'flex';
+        document.getElementById('btn-to-create').style.display = 'none';
         document.getElementById('btn-play').style.display = 'none';
-        CharacterModule.focusClass(0);
+        
+        // Activar visualización 3D de avatares en la escena
+        CharacterModule.setCreationMode(true);
     });
 
-    // BOTÓN CANCELAR CREACIÓN (CORREGIDO)
+    // BOTÓN CANCELAR CREACIÓN
     document.getElementById('btn-cancel-create').addEventListener('click', () => {
         document.getElementById('panel-create-controls').style.display = 'none';
-        document.getElementById('btn-arrow-left').style.display = 'none';
-        document.getElementById('btn-arrow-right').style.display = 'none';
+        document.getElementById('btn-to-create').style.display = 'block';
         document.getElementById('create-char-name').value = '';
+        
+        // Ocultar avatares 3D de la escena
+        CharacterModule.setCreationMode(false);
+        
+        if (selectedCharacter) {
+            document.getElementById('btn-play').style.display = 'block';
+        }
     });
 
     // Flechas para cambiar de clase 3D
@@ -97,45 +106,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.emit('character:create', { name, classType: selectedClass.id }, (res) => {
             if (res.success) {
-                renderCharacterList(res.characters);
-                document.getElementById('btn-cancel-create').click(); // Limpiar UI
+                renderCharacterSlots(res.characters);
+                document.getElementById('btn-cancel-create').click(); // Limpiar UI y cerrar modo creación
             } else {
                 alert(res.message || 'Error al crear personaje.');
             }
         });
     });
 
-    function renderCharacterList(list) {
+    function renderCharacterSlots(list) {
         const container = document.getElementById('character-list');
         container.innerHTML = '';
 
-        list.forEach(char => {
+        // Renderizar 3 slots fijos estilo Mu Online
+        for (let i = 0; i < 3; i++) {
+            const char = list[i];
             const div = document.createElement('div');
-            div.className = 'char-slot';
-            div.innerText = `${char.name} (${char.classType.toUpperCase()})`;
-            div.addEventListener('click', () => {
-                document.querySelectorAll('.char-slot').forEach(s => s.classList.remove('selected'));
-                div.classList.add('selected');
-                selectedCharacter = char;
 
-                document.getElementById('char-stats-info').innerHTML = `
-                    <strong>${char.name}</strong><br>
-                    Clase: ${char.classType}<br>
-                    Nivel: ${char.level || 1}
-                `;
-                document.getElementById('btn-play').style.display = 'block';
-            });
+            if (char) {
+                div.className = 'char-slot';
+                div.innerHTML = `<strong>${char.name}</strong><br><span style="font-size:9px; color:#ffd700;">Lv.${char.level || 1} ${char.classType.toUpperCase()}</span>`;
+                div.addEventListener('click', () => {
+                    document.querySelectorAll('.char-slot').forEach(s => s.classList.remove('selected'));
+                    div.classList.add('selected');
+                    selectedCharacter = char;
+
+                    // Si no estamos creando un personaje, mostrar botón de jugar
+                    if (document.getElementById('panel-create-controls').style.display !== 'flex') {
+                        document.getElementById('btn-play').style.display = 'block';
+                    }
+                });
+            } else {
+                div.className = 'char-slot empty';
+                div.innerText = `[ VACÍO ]`;
+            }
             container.appendChild(div);
-        });
+        }
     }
 
     // Entrar al Mapa Multijugador
     document.getElementById('btn-play').addEventListener('click', () => {
         if (!selectedCharacter) return;
         showScreen('screen-game');
-        document.getElementById('hud-char-name').innerText = selectedCharacter.name;
+        document.getElementById('hud-char-name').innerText = `${selectedCharacter.name} (Lv.${selectedCharacter.level || 1})`;
         if (window.GameModule) window.GameModule.init(socket, selectedCharacter);
     });
 
-    document.getElementById('btn-logout').addEventListener('click', () => showScreen('screen-login'));
+    // Botón para salir desde el juego al menú principal
+    const btnReturnMenu = document.getElementById('btn-return-menu');
+    if (btnReturnMenu) {
+        btnReturnMenu.addEventListener('click', () => {
+            showScreen('screen-character');
+            document.getElementById('btn-play').style.display = selectedCharacter ? 'block' : 'none';
+        });
+    }
+
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        selectedCharacter = null;
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+        showScreen('screen-login');
+    });
 });
