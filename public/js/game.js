@@ -10,7 +10,8 @@ const Game = {
         color: 0xff0033,
         theta: 0, 
         phi: Math.PI / 2, 
-        heading: 0 
+        heading: 0,   // Rotación horizontal (Yaw)
+        pitch: 0      // Inclinación vertical de la mirada (Pitch)
     },
     remotePlayers: {},
     keys: {},
@@ -74,6 +75,7 @@ const Game = {
         this.localPlayer.theta = 0;
         this.localPlayer.phi = 0.3;
         this.localPlayer.heading = 0;
+        this.localPlayer.pitch = 0;
 
         // Crear malla del jugador local
         this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
@@ -82,7 +84,7 @@ const Game = {
         const hudName = document.getElementById('hud-char-name');
         if (hudName) hudName.innerText = `${this.localPlayer.name} (Lv.${this.localPlayer.level})`;
 
-        // --- CREAR MIRILLA DINÁMICA (ENFOQUE OCULAR) ---
+        // --- CREAR MIRILLA DINÁMICA ---
         this.createDynamicCrosshair();
 
         // Eventos de teclado
@@ -91,7 +93,7 @@ const Game = {
 
         canvas.addEventListener('contextmenu', e => e.preventDefault());
         
-        // Activar Pointer Lock al hacer clic en el canvas para mover la vista ocular con el mouse
+        // Activar Pointer Lock al hacer clic para controlar la vista completa con el mouse
         canvas.addEventListener('click', () => {
             canvas.requestPointerLock();
         });
@@ -99,7 +101,11 @@ const Game = {
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.0025;
+                // Rotación horizontal (Yaw / Giro lateral)
                 this.localPlayer.heading -= e.movementX * sensitivity;
+                // Rotación vertical (Pitch / Ver suelo y cielo), limitada para no voltear la vista
+                this.localPlayer.pitch -= e.movementY * sensitivity;
+                this.localPlayer.pitch = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, this.localPlayer.pitch));
             }
         });
 
@@ -120,10 +126,9 @@ const Game = {
             crosshair.style.borderRadius = '50%';
             crosshair.style.transform = 'translate(-50%, -50%) scale(1)';
             crosshair.style.pointerEvents = 'none';
-            crosshair.style.transition = 'transform 0.1s ease, width 0.1s ease, height 0.1s ease';
+            crosshair.style.transition = 'transform 0.1s ease';
             crosshair.style.zIndex = '100';
 
-            // Punto central de la mirilla
             const dot = document.createElement('div');
             dot.style.position = 'absolute';
             dot.style.top = '50%';
@@ -142,10 +147,9 @@ const Game = {
     createPlayerAvatar(classType, customColor) {
         const group = new THREE.Group();
 
-        // En primera persona ocultamos la malla principal del jugador local para no bloquear la visión de los ojos,
-        // pero dejamos estructura lista si se requiere renderizar extremidades o armas a futuro.
+        // Ocultar cuerpo en primera persona
         const bodyGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: customColor, visible: false }); // Oculto en 1ra persona
+        const bodyMat = new THREE.MeshStandardMaterial({ color: customColor, visible: false });
         const body = new THREE.Mesh(bodyGeo, bodyMat);
         body.position.y = 0.3;
         group.add(body);
@@ -179,12 +183,10 @@ const Game = {
 
         if (this.localPlayer.mesh) {
             const p = this.localPlayer;
-
-            // --- SIMULACIÓN DE ENFOQUE OCULAR EN LA MIRILLA ---
             const crosshair = document.getElementById('game-crosshair');
             let isMoving = false;
 
-            // --- MOVIMIENTO WASD / FLECHAS ---
+            // --- LÓGICA DE MOVIMIENTO WASD / FLECHAS ---
             let moveForward = 0;
             let moveSide = 0;
 
@@ -193,7 +195,6 @@ const Game = {
             if (this.keys['KeyA'] || this.keys['ArrowLeft']) { moveSide -= p.speed; isMoving = true; }
             if (this.keys['KeyD'] || this.keys['ArrowRight']) { moveSide += p.speed; isMoving = true; }
 
-            // Efecto visual en la mirilla: se expande al caminar (simulando enfoque/inestabilidad ocular) y se contrae al estar quieto
             if (crosshair) {
                 if (isMoving) {
                     crosshair.style.transform = 'translate(-50%, -50%) scale(1.4)';
@@ -206,8 +207,9 @@ const Game = {
 
             if (moveForward !== 0 || moveSide !== 0) {
                 const R = this.planetRadius;
-                const deltaTheta = (moveForward * Math.sin(p.heading) - moveSide * Math.cos(p.heading)) / R;
-                const deltaPhi   = (-moveForward * Math.cos(p.heading) - moveSide * Math.sin(p.heading)) / R;
+                // Movimiento alineado exactamente con la dirección de la mirilla (heading)
+                const deltaTheta = (moveForward * Math.sin(p.heading) + moveSide * Math.cos(p.heading)) / R;
+                const deltaPhi   = (-moveForward * Math.cos(p.heading) + moveSide * Math.sin(p.heading)) / R;
 
                 p.theta += deltaTheta;
                 p.phi += deltaPhi;
@@ -241,18 +243,18 @@ const Game = {
                 this.socket.emit('playerMove', { x, y, z });
             }
 
-            // --- CÁMARA EN PRIMERA PERSONA (JUSTO EN LOS OJOS DEL PERSONAJE) ---
-            // Altura de los ojos sobre el centro del personaje (aproximadamente a la altura de la cabeza)
+            // --- CÁMARA PRIMERA PERSONA CON PITCH Y YAW ---
             const eyeHeight = 0.75; 
             const eyePosition = p.mesh.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
 
             this.camera.position.copy(eyePosition);
 
-            // Dirección hacia donde mira la cámara basada en el heading y el vector tangente del planeta
-            const lookDistance = 5.0;
-            const lookDirection = tangent.clone().multiplyScalar(lookDistance);
-            const targetLookAt = eyePosition.clone().add(lookDirection);
-
+            // Dirección hacia donde apunta la mirada considerando la rotación horizontal (heading) y vertical (pitch)
+            const lookDist = 5.0;
+            const forwardLook = tangent.clone().multiplyScalar(lookDist * Math.cos(p.pitch));
+            const verticalLook = normal.clone().multiplyScalar(lookDist * Math.sin(p.pitch));
+            
+            const targetLookAt = eyePosition.clone().add(forwardLook).add(verticalLook);
             this.camera.lookAt(targetLookAt);
         }
 
