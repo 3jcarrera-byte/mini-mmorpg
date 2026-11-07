@@ -26,8 +26,8 @@ const WorldModule = (() => {
         return planetMesh;
     }
 
-    // --- DISEÑO DETALLADO DE ÁRBOLES Y ROCAS ---
-    function createDetailedTree(position) {
+    // --- DISEÑO DETALLADO Y DINÁMICO DE ÁRBOLES (CON CICLO DE VIDA) ---
+    function createDetailedTree(position, initialInitialState = 'adult', initialProgress = 1.0) {
         const group = new THREE.Group();
         
         // Tronco
@@ -57,16 +57,103 @@ const WorldModule = (() => {
         group.rotateX(Math.PI / 2);
         group.position.addScaledVector(group.position.clone().normalize(), 0.05);
 
-        return {
-            mesh: group,
-            collider: {
-                position: group.position.clone(),
-                radius: 0.18,
-                height: 0.6
-            },
-            resourceType: 'wood',
-            resourceAmount: 15
+        const colliderRef = {
+            position: group.position.clone(),
+            radius: 0.18,
+            height: 0.6
         };
+
+        const treeEntity = {
+            mesh: group,
+            collider: colliderRef,
+            resourceType: 'wood',
+            resourceAmount: 15,
+            
+            // Estados ecológicos
+            state: initialInitialState, // 'sapling', 'adult', 'stump'
+            growthProgress: initialProgress,
+            health: 100,
+            regrowthTimer: 0,
+            seedTimer: 0,
+
+            update(delta, scene, obstaclesList, allObjectsList) {
+                // 1. Crecimiento del brote
+                if (this.state === 'sapling') {
+                    this.growthProgress += delta * 0.04; // Velocidad de crecimiento
+                    if (this.growthProgress >= 1.0) {
+                        this.growthProgress = 1.0;
+                        this.state = 'adult';
+                        group.scale.set(1, 1, 1);
+                    } else {
+                        group.scale.setScalar(this.growthProgress);
+                    }
+                    return;
+                }
+
+                // 2. Generación de semillas periódicas en árboles adultos
+                if (this.state === 'adult') {
+                    this.seedTimer += delta;
+                    if (this.seedTimer > 50) { // Cada ~50 segundos intenta plantar un brote cerca
+                        this.seedTimer = 0;
+                        this.trySpawnSeed(scene, obstaclesList, allObjectsList);
+                    }
+                }
+
+                // 3. Sistema de retoño del tocón si no es talado/extraído del todo
+                if (this.state === 'stump') {
+                    this.regrowthTimer += delta;
+                    if (this.regrowthTimer > 70) { // Tras 70 segundos sin extraer el tocón, retoña
+                        this.regrowthTimer = 0;
+                        this.state = 'sapling';
+                        this.growthProgress = 0.2;
+                        this.health = 100;
+                        group.scale.setScalar(0.2);
+                        
+                        // Restaurar dimensiones de colisión de adulto
+                        this.collider.radius = 0.18;
+                        this.collider.height = 0.6;
+                    }
+                }
+            },
+
+            chopDown() {
+                if (this.state !== 'adult') return;
+
+                this.state = 'stump';
+                this.health = 0;
+                this.regrowthTimer = 0;
+
+                // Achicar visualmente a modo de tocón
+                group.scale.set(1, 0.25, 1);
+
+                // Reducir colisionador para permitir paso fluido
+                this.collider.radius = 0.08;
+                this.collider.height = 0.15;
+            },
+
+            trySpawnSeed(scene, obstaclesList, allObjectsList) {
+                // Crear una posición aleatoria cercana variando ligeramente sobre la esfera
+                const offsetTheta = (Math.random() - 0.5) * 0.12;
+                const offsetPhi = (Math.random() - 0.5) * 0.12;
+                
+                const currentPos = group.position.clone();
+                const newPos = currentPos.add(new THREE.Vector3(offsetTheta, 0, offsetPhi)).normalize().multiplyScalar(planetRadius);
+
+                // Instanciar nuevo brote (sapling)
+                const newTree = createDetailedTree(newPos, 'sapling', 0.15);
+                newTree.mesh.scale.setScalar(0.15);
+
+                scene.add(newTree.mesh);
+                obstaclesList.push(newTree.collider);
+                allObjectsList.push(newTree);
+            }
+        };
+
+        if (initialInitialState === 'sapling') {
+            group.scale.setScalar(initialProgress);
+        }
+
+        return treeEntity;
     }
 
     function createDetailedRock(position) {
@@ -115,7 +202,7 @@ const WorldModule = (() => {
             const position = new THREE.Vector3(x, y, z);
 
             const isTree = i < trees;
-            const featureData = isTree ? createDetailedTree(position) : createDetailedRock(position);
+            const featureData = isTree ? createDetailedTree(position, 'adult', 1.0) : createDetailedRock(position);
 
             if (featureData) {
                 if (featureData.mesh) scene.add(featureData.mesh);
@@ -178,11 +265,21 @@ const WorldModule = (() => {
         if (planetMesh) planetMesh.rotation.y += 0.001;
     }
 
+    // --- ACTUALIZADOR DE ECOSISTEMA GLOBAL (LLAMAR EN EL BUCLE DEL JUEGO) ---
+    function updateEcosystem(delta, scene, obstaclesList) {
+        interactiveObjects.forEach(obj => {
+            if (typeof obj.update === 'function') {
+                obj.update(delta, scene, obstaclesList, interactiveObjects);
+            }
+        });
+    }
+
     return {
         createPlanet,
         buildStructure,
         updatePlayerOnSphere,
         rotatePlanet,
+        updateEcosystem,
         getRadius: () => planetRadius,
         getObstacles: () => obstacles,
         getInteractiveObjects: () => interactiveObjects
