@@ -1,7 +1,7 @@
-
 document.addEventListener('DOMContentLoaded', () => {
     const socket = io();
     let selectedCharacter = null;
+    let currentUserCharacters = [];
 
     // Inicializar Motor 3D de Selección
     CharacterModule.init3D();
@@ -23,7 +23,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Notificar al servidor el inicio de sesión enviando usuario y clave
         socket.emit('auth:login', { username: user, password: pass }, (response) => {
             if (response.success) {
-                renderCharacterSlots(response.characters);
+                currentUserCharacters = response.characters || [];
+                renderCharacterSlots(currentUserCharacters);
+                
+                // Renderizar los personajes en la escena 3D (Estilo Albion)
+                CharacterModule.renderUserCharacters3D(currentUserCharacters);
+                
                 showScreen('screen-character');
             } else {
                 alert(response.message || 'Error de autenticación');
@@ -69,13 +74,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-forgot-to-login').addEventListener('click', () => showScreen('screen-login'));
 
-    // --- 4. CREACIÓN Y SELECCIÓN DE PERSONAJES (ESTILO MU) ---
+    // --- 4. CREACIÓN Y SELECCIÓN DE PERSONAJES (ESTILO ALBION / MU) ---
     document.getElementById('btn-to-create').addEventListener('click', () => {
         document.getElementById('panel-create-controls').style.display = 'flex';
         document.getElementById('btn-to-create').style.display = 'none';
         document.getElementById('btn-play').style.display = 'none';
         
-        // Activar visualización 3D de avatares en la escena
+        // Activar visualización 3D de avatares de clase para crear
         CharacterModule.setCreationMode(true);
     });
 
@@ -85,15 +90,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-to-create').style.display = 'block';
         document.getElementById('create-char-name').value = '';
         
-        // Ocultar avatares 3D de la escena
+        // Ocultar avatares de creación y restaurar los personajes del usuario en 3D
         CharacterModule.setCreationMode(false);
+        CharacterModule.renderUserCharacters3D(currentUserCharacters);
         
         if (selectedCharacter) {
             document.getElementById('btn-play').style.display = 'block';
         }
     });
 
-    // Flechas para cambiar de clase 3D
+    // Flechas para cambiar de clase 3D en modo creación
     document.getElementById('btn-arrow-left').addEventListener('click', () => CharacterModule.prevClass());
     document.getElementById('btn-arrow-right').addEventListener('click', () => CharacterModule.nextClass());
 
@@ -106,19 +112,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.emit('character:create', { name, classType: selectedClass.id }, (res) => {
             if (res.success) {
-                renderCharacterSlots(res.characters);
-                document.getElementById('btn-cancel-create').click(); // Limpiar UI y cerrar modo creación
+                currentUserCharacters = res.characters;
+                renderCharacterSlots(currentUserCharacters);
+                document.getElementById('btn-cancel-create').click(); // Limpiar UI y salir de modo creación
             } else {
                 alert(res.message || 'Error al crear personaje.');
             }
         });
     });
 
+    // Listener global cuando haces clic directamente en un personaje 3D en el canvas
+    window.onCharacter3DSelected = (char) => {
+        selectedCharacter = char;
+        
+        // Sincronizar selección visual en los slots inferiores
+        const slots = document.querySelectorAll('.char-slot');
+        slots.forEach((slot, idx) => {
+            slot.classList.toggle('selected', currentUserCharacters[idx] && currentUserCharacters[idx].id === char.id);
+        });
+
+        if (document.getElementById('panel-create-controls').style.display !== 'flex') {
+            const playBtn = document.getElementById('btn-play');
+            playBtn.style.display = 'block';
+            playBtn.innerText = `JUGAR CON ${char.name.toUpperCase()}`;
+        }
+    };
+
     function renderCharacterSlots(list) {
         const container = document.getElementById('character-list');
         container.innerHTML = '';
 
-        // Renderizar 3 slots fijos estilo Mu Online
+        // Renderizar 3 slots fijos estilo Mu/Albion
         for (let i = 0; i < 3; i++) {
             const char = list[i];
             const div = document.createElement('div');
@@ -131,9 +155,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     div.classList.add('selected');
                     selectedCharacter = char;
 
-                    // Si no estamos creando un personaje, mostrar botón de jugar
                     if (document.getElementById('panel-create-controls').style.display !== 'flex') {
-                        document.getElementById('btn-play').style.display = 'block';
+                        const playBtn = document.getElementById('btn-play');
+                        playBtn.style.display = 'block';
+                        playBtn.innerText = `JUGAR CON ${char.name.toUpperCase()}`;
                     }
                 });
             } else {
@@ -149,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!selectedCharacter) return;
         showScreen('screen-game');
         document.getElementById('hud-char-name').innerText = `${selectedCharacter.name} (Lv.${selectedCharacter.level || 1})`;
-        if (window.GameModule) window.GameModule.init(socket, selectedCharacter);
+        if (window.GameModule) window.GameModule.start(selectedCharacter);
     });
 
     // Botón para salir desde el juego al menú principal
@@ -157,12 +182,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnReturnMenu) {
         btnReturnMenu.addEventListener('click', () => {
             showScreen('screen-character');
+            CharacterModule.renderUserCharacters3D(currentUserCharacters);
             document.getElementById('btn-play').style.display = selectedCharacter ? 'block' : 'none';
         });
     }
 
     document.getElementById('btn-logout').addEventListener('click', () => {
         selectedCharacter = null;
+        currentUserCharacters = [];
         document.getElementById('login-username').value = '';
         document.getElementById('login-password').value = '';
         showScreen('screen-login');
