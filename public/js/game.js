@@ -28,6 +28,7 @@ const Game = {
     
     crosshairOffset: { x: 0, y: 0 },
     maxCrosshairRadius: 40,
+    lastFrameTime: 0, // Para el cálculo de delta en el ecosistema
 
     start(characterData) {
         if (characterData) {
@@ -54,6 +55,7 @@ const Game = {
         this.initEngine();
         this.connectServer();
         this.isGameRunning = true;
+        this.lastFrameTime = performance.now();
         this.loop();
     },
 
@@ -285,6 +287,16 @@ const Game = {
     loop() {
         if (!this.isGameRunning) return;
         requestAnimationFrame(() => this.loop());
+
+        // Calcular el delta de tiempo transcurrido en segundos
+        const now = performance.now();
+        const delta = (now - this.lastFrameTime) / 1000;
+        this.lastFrameTime = now;
+
+        // Actualizar el ecosistema del mundo (crecimiento de árboles, semillas, retoños)
+        if (typeof WorldModule.updateEcosystem === 'function') {
+            WorldModule.updateEcosystem(delta, this.scene, WorldModule.getObstacles());
+        }
 
         if (this.localPlayer.mesh) {
             const p = this.localPlayer;
