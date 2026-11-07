@@ -5,12 +5,14 @@ const WorldModule = (() => {
     const planetRadius = 5;
     const structures = [];
     const obstacles = []; // Almacén global de obstáculos para colisiones
+    const interactiveObjects = []; // Almacén para objetos recolectables o dinámicos
     const textureLoader = new THREE.TextureLoader();
 
     function createPlanet(scene, worldConfig = {}) {
         // Limpiar obstáculos anteriores si se recarga el mundo
         obstacles.length = 0;
         structures.length = 0;
+        interactiveObjects.length = 0;
 
         const groundTexture = worldConfig.textureUrl ? textureLoader.load(worldConfig.textureUrl) : null;
         if (groundTexture) {
@@ -35,39 +37,54 @@ const WorldModule = (() => {
     }
 
     function generateFeatures(scene, trees, rocks) {
-        const featureGeo = new THREE.ConeGeometry(0.2, 0.5, 5);
-        const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666, flatShading: true });
-        const treeMat = new THREE.MeshStandardMaterial({ color: 0x0b6623, flatShading: true });
-
         for (let i = 0; i < (trees + rocks); i++) {
             const u = Math.random();
             const v = Math.random();
             const theta = u * 2.0 * Math.PI;
             const phi = Math.acos(2.0 * v - 1.0);
 
-            const isTree = i < trees;
-            const mesh = new THREE.Mesh(featureGeo, isTree ? treeMat : rockMat);
-
             const r = planetRadius;
             const x = r * Math.sin(phi) * Math.cos(theta);
             const y = r * Math.sin(phi) * Math.sin(theta);
             const z = r * Math.cos(phi);
 
-            mesh.position.set(x, y, z);
-            mesh.lookAt(0, 0, 0);
-            mesh.rotateX(Math.PI / 2);
-            
-            // Elevar levemente la malla para que la base quede alineada perfectamente con la superficie
-            mesh.position.addScaledVector(mesh.position.clone().normalize(), 0.05);
+            const position = new THREE.Vector3(x, y, z);
+            const isTree = i < trees;
 
-            scene.add(mesh);
+            // Delegar la creación a los submódulos independientes si existen, de lo contrario usar fallback seguro
+            let featureData;
+            if (isTree && window.TreeObject) {
+                featureData = window.TreeObject.create(position);
+            } else if (!isTree && window.RockObject) {
+                featureData = window.RockObject.create(position);
+            } else {
+                // Fallback clásico por si los submódulos cargan después
+                const featureGeo = new THREE.ConeGeometry(0.2, 0.5, 5);
+                const mat = new THREE.MeshStandardMaterial({ color: isTree ? 0x0b6623 : 0x666666, flatShading: true });
+                const mesh = new THREE.Mesh(featureGeo, mat);
+                mesh.position.copy(position);
+                mesh.lookAt(0, 0, 0);
+                mesh.rotateX(Math.PI / 2);
+                mesh.position.addScaledVector(mesh.position.clone().normalize(), 0.05);
+                scene.add(mesh);
 
-            // Registrar cada árbol y roca con posición elevada real y radio compacto
-            obstacles.push({
-                position: mesh.position.clone(),
-                radius: 0.18,   // Radio de colisión horizontal compacto y justo
-                height: 0.35    // Altura reducida para que el jugador pueda rodearlos con total fluidez
-            });
+                featureData = {
+                    mesh: mesh,
+                    collider: {
+                        position: mesh.position.clone(),
+                        radius: 0.18,
+                        height: 0.35
+                    },
+                    resourceType: isTree ? 'wood' : 'stone',
+                    resourceAmount: isTree ? 10 : 15
+                };
+            }
+
+            if (featureData) {
+                if (featureData.mesh) scene.add(featureData.mesh);
+                if (featureData.collider) obstacles.push(featureData.collider);
+                interactiveObjects.push(featureData);
+            }
         }
     }
 
@@ -132,7 +149,8 @@ const WorldModule = (() => {
         updatePlayerOnSphere,
         rotatePlanet,
         getRadius: () => planetRadius,
-        getObstacles: () => obstacles
+        getObstacles: () => obstacles,
+        getInteractiveObjects: () => interactiveObjects
     };
 })();
 
