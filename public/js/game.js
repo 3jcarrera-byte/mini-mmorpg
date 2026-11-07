@@ -110,26 +110,24 @@ const Game = {
         if (this.localPlayer.mesh) {
             const playerInfo = WorldModule.updatePlayerOnSphere(this.localPlayer.mesh, this.keys);
 
-            // --- VISTA ISOMÉTRICA / ESTRATÉGICA TIPO WARCRAFT 3 ---
+            // --- VISTA CERCANA Y FLUIDA (ESTILO ACCIÓN / TERCERA PERSONA) ---
             const playerPos = playerInfo.position;
-            const normal = playerPos.clone().normalize(); // Vector desde el centro del planeta hacia el jugador
+            const normal = playerPos.clone().normalize(); // Dirección radial desde el núcleo
 
-            // Distancia y altura isométrica diagonal respecto al personaje
-            const distanceBack = 5.0; // Qué tan atrás se coloca
-            const heightUp = 4.5;     // Qué tan arriba se eleva
+            // Distancia y altura equilibradas para ver perfectamente al personaje y el terreno cercano
+            const distanceBack = 3.2; 
+            const heightUp = 1.4;     
 
-            // Calculamos la posición de la cámara alejándose del núcleo, pero desplazada hacia atrás en la esfera
-            const tangentOffset = playerPos.clone().normalize().cross(new THREE.Vector3(0, 1, 0)).normalize();
-            
             const camTargetPos = playerPos.clone()
                 .add(normal.clone().multiplyScalar(heightUp))
                 .add(playerPos.clone().normalize().multiplyScalar(-distanceBack));
 
-            // Suavizado fluido de la cámara
-            this.camera.position.lerp(camTargetPos, 0.12);
+            // Suavizado dinámico fluido para seguir los pasos del héroe sin tirones
+            this.camera.position.lerp(camTargetPos, 0.2);
             
-            // Apuntar directamente al personaje para verlo completo de cuerpo entero
-            this.camera.lookAt(playerPos);
+            // Apuntar ligeramente por encima de los pies para centrar el cuerpo en pantalla
+            const lookTarget = playerPos.clone().add(normal.clone().multiplyScalar(0.4));
+            this.camera.lookAt(lookTarget);
         }
 
         WorldModule.rotatePlanet();
