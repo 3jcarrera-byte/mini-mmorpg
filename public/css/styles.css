@@ -44,18 +44,77 @@ button:hover {
 
 /* Panel central inferior */
 .mu-select-panel {
-    position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-    z-index: 10; width: 450px; background: rgba(5, 5, 5, 0.9);
+    position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%);
+    z-index: 10; width: 440px; background: rgba(5, 5, 5, 0.92);
     border: 2px solid transparent; border-image: linear-gradient(135deg, #ffd700, #ff0033) 1;
     padding: 15px; display: flex; flex-direction: column; align-items: center;
     box-shadow: 0 0 25px rgba(0,0,0,0.9);
 }
 
-/* Panel Vertical Derecho para Atributos (Acercado al héroe) */
+/* Panel Vertical Derecho para Atributos */
 .attributes-panel {
     position: absolute; 
-    top: 18vh; 
-    right: 14vw; 
+    top: 22vh; 
+    right: 15vw; 
     z-index: 10;
-    width: 210px; 
-    background:
+    width: 220px !important; 
+    background: rgba(5, 5, 5, 0.92);
+    border: 2px solid transparent; 
+    border-image: linear-gradient(135deg, #ffd700, #ff0033) 1;
+    padding: 15px; 
+    display: flex; 
+    flex-direction: column !important;
+    box-shadow: 0 0 20px rgba(0,0,0,0.85);
+}
+
+.stat-row {
+    display: flex !important; 
+    flex-direction: row !important;
+    justify-content: space-between !important; 
+    width: 100% !important;
+    font-size: 13px; 
+    margin: 6px 0; 
+    color: #ccc;
+    border-bottom: 1px dashed #333; 
+    padding-bottom: 4px;
+}
+.stat-row span:last-child { color: #ffd700; font-weight: bold; }
+
+.creation-controls {
+    display: none; width: 100%; flex-direction: column; align-items: center; margin-top: 10px;
+    border-top: 1px solid #333; padding-top: 10px;
+}
+
+/* Botones de flechas compactos (Forzados para evitar que tomen el 100% del width global) */
+button.btn-arrow {
+    position: absolute !important; 
+    z-index: 20 !important; 
+    top: 48% !important; 
+    transform: translateY(-50%) !important;
+    background: rgba(10, 10, 10, 0.85) !important; 
+    border: 2px solid #ffd700 !important; 
+    color: #ffd700 !important;
+    font-size: 26px !important; 
+    font-weight: bold !important; 
+    width: 50px !important;
+    height: 50px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    cursor: pointer !important; 
+    transition: all 0.3s !important; 
+    display: none;
+    border-radius: 4px !important;
+}
+button.btn-arrow:hover { background: #ff0033 !important; color: #fff !important; box-shadow: 0 0 15px #ff0033 !important; }
+button.arrow-left { left: 28vw !important; } 
+button.arrow-right { right: 28vw !important; } 
+
+.panel-top-name {
+    position: absolute; top: 30px; left: 50%; transform: translateX(-50%); z-index: 10;
+    background: rgba(5, 5, 5, 0.85); padding: 8px 30px; border: 2px solid transparent;
+    border-image: linear-gradient(135deg, #ffd700, #ff0033) 1; text-align: center; display: none;
+}
+.btn-large { font-size: 15px; padding: 12px; border-width: 2px; }
+.game-container { display: flex; flex-direction: column; align-items: center; }
+#mapCanvas { border: 3px solid transparent; border-image: linear-gradient(135deg, #ffd700, #ff0033) 1; }
+.hud { margin-top: 10px; font-size: 12px; color: #ffd700; text-align: center; line-height: 1.6; }
