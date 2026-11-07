@@ -1,7 +1,7 @@
 // Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK)
 const WorldModule = (() => {
     let planetMesh;
-    let playerPos = { theta: 0, phi: Math.PI / 2 };
+    let playerPos = { theta: 0, phi: Math.PI / 4 };
     const planetRadius = 5;
     const structures = [];
     const obstacles = []; // Almacén global de obstáculos para colisiones
