@@ -1,4 +1,4 @@
-// Renderizador 3D para Selección/Creación estilo Diablo
+// Renderizador 3D para Selección/Creación estilo Mu / Diablo
 const CharacterModule = (() => {
     let scene, camera, renderer;
     let meshes = {};
@@ -17,46 +17,68 @@ const CharacterModule = (() => {
         scene.fog = new THREE.FogExp2(0x000000, 0.15);
 
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.5, 4);
+        camera.position.set(0, 1.2, 3.5);
 
         renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
 
         // Luces Cinemáticas
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
 
         const pointLight = new THREE.PointLight(0xffd700, 2, 10);
         pointLight.position.set(0, 3, 2);
         scene.add(pointLight);
 
-        // Crear Mallas de los personajes
+        // Crear Grupos y Mallas de las clases (Ocultas inicialmente)
         classes.forEach((c, idx) => {
-            const geo = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 16);
-            const mat = new THREE.MeshPhongMaterial({ color: c.color, emissive: 0x111111 });
-            const mesh = new THREE.Mesh(geo, mat);
+            const group = new THREE.Group();
             
+            const geo = new THREE.CylinderGeometry(0.25, 0.25, 1.0, 16);
+            const mat = new THREE.MeshPhongMaterial({ color: c.color, emissive: 0x111111 });
+            const body = new THREE.Mesh(geo, mat);
+            group.add(body);
+
             // Cabeza
-            const headGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            const headGeo = new THREE.SphereGeometry(0.18, 16, 16);
             const headMat = new THREE.MeshPhongMaterial({ color: 0xffd700 });
             const head = new THREE.Mesh(headGeo, headMat);
-            head.position.y = 0.8;
-            mesh.add(head);
+            head.position.y = 0.7;
+            group.add(head);
 
-            mesh.position.set((idx - 1) * 2, 0, 0); // Separación horizontal
-            scene.add(mesh);
-            meshes[c.id] = mesh;
+            group.position.set((idx - 1) * 1.5, 0, 0); // Separación horizontal
+            group.visible = false; // Ocultos por defecto hasta que se active el modo creación
+            scene.add(group);
+            meshes[c.id] = group;
         });
 
         window.addEventListener('resize', onWindowResize);
         animate();
     }
 
+    // Controlar visibilidad de los modelos 3D y elementos UI de creación
+    function setCreationMode(active) {
+        Object.keys(meshes).forEach(key => {
+            meshes[key].visible = active;
+        });
+        const topName = document.getElementById('panel-top-name');
+        const arrowLeft = document.getElementById('btn-arrow-left');
+        const arrowRight = document.getElementById('btn-arrow-right');
+
+        if (topName) topName.style.display = active ? 'block' : 'none';
+        if (arrowLeft) arrowLeft.style.display = active ? 'block' : 'none';
+        if (arrowRight) arrowRight.style.display = active ? 'block' : 'none';
+
+        if (active) focusClass(0);
+    }
+
     function animate() {
         requestAnimationFrame(animate);
         Object.keys(meshes).forEach(key => {
-            meshes[key].rotation.y += 0.01;
+            if (meshes[key].visible) {
+                meshes[key].rotation.y += 0.015;
+            }
         });
         if (renderer && scene && camera) {
             renderer.render(scene, camera);
@@ -80,12 +102,16 @@ const CharacterModule = (() => {
             camera.position.x = targetMesh.position.x;
         }
 
-        document.getElementById('char-display-name').innerText = targetClass.name.toUpperCase();
+        const nameEl = document.getElementById('char-display-name');
+        if (nameEl) {
+            nameEl.innerText = `CLASE: ${targetClass.name.toUpperCase()}`;
+        }
         return targetClass;
     }
 
     return {
         init3D,
+        setCreationMode,
         focusClass,
         getClasses: () => classes,
         getCurrentClass: () => classes[currentClassIndex],
