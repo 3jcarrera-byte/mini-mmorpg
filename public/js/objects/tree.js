@@ -1,128 +1,145 @@
 // public/js/objects/tree.js
 const TreeObject = {
-    create(position) {
+    create(position, initialState = 'adult', initialProgress = 1.0) {
         const group = new THREE.Group();
         
-        // --- 1. CREACIÓN DE GEOMETRÍAS ---
-        const trunkGeo = new THREE.CylinderGeometry(0.08, 0.12, 0.5, 6);
+        // Tronco
+        const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.45, 6);
         const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9, flatShading: true });
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-        trunk.position.y = 0.25;
+        trunk.position.y = 0.22;
         group.add(trunk);
 
+        // Copas en capas (estilo pino estilizado)
         const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d8a39, roughness: 0.7, flatShading: true });
         
-        const layer1 = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.5, 5), leavesMat);
-        layer1.position.y = 0.5;
+        const layer1 = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.45, 5), leavesMat);
+        layer1.position.y = 0.45;
         group.add(layer1);
 
-        const layer2 = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.4, 5), leavesMat);
-        layer2.position.y = 0.8;
+        const layer2 = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.35, 5), leavesMat);
+        layer2.position.y = 0.7;
         group.add(layer2);
 
-        const layer3 = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.3, 5), leavesMat);
-        layer3.position.y = 1.05;
+        const layer3 = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.25, 5), leavesMat);
+        layer3.position.y = 0.9;
         group.add(layer3);
 
-        // Posicionamiento sobre la esfera
         group.position.copy(position);
         group.lookAt(0, 0, 0);
         group.rotateX(Math.PI / 2);
         group.position.addScaledVector(group.position.clone().normalize(), 0.05);
 
-        // --- 2. ESTADOS Y PROPIEDADES DE SIMULACIÓN ---
+        const colliderRef = {
+            position: group.position.clone(),
+            radius: 0.18,
+            height: 0.6
+        };
+
         const treeEntity = {
             mesh: group,
-            collider: {
-                position: group.position.clone(),
-                radius: 0.2,
-                height: 0.7
-            },
+            collider: colliderRef,
             resourceType: 'wood',
             resourceAmount: 15,
             
-            // Estados ecológicos
-            state: 'adult', // 'sapling' (brote), 'adult', 'stump' (tocón), 'fallen' (caído)
-            growthProgress: 1.0, // De 0.0 a 1.0
+            state: initialState, // 'sapling', 'adult', 'stump'
+            growthProgress: initialProgress,
             health: 100,
-            regrowthTimer: 0, // Tiempo para que el tocón retoñe
-            seedTimer: 0,     // Tiempo para generar una semilla cercana
+            regrowthTimer: 0,
+            seedTimer: 0,
 
-            // Método de actualización lógica por frame
-            update(delta, scene, obstaclesList, allTreesList) {
-                // Si es un brote pequeño, va creciendo poco a poco
+            update(delta, scene, obstaclesList, allObjectsList) {
+                // 1. Crecimiento rápido de brote a adulto en exactamente 60 segundos (1 min)
                 if (this.state === 'sapling') {
-                    this.growthProgress += delta * 0.05; // Ajusta la velocidad de crecimiento
+                    this.growthProgress += delta / 60.0; 
                     if (this.growthProgress >= 1.0) {
                         this.growthProgress = 1.0;
                         this.state = 'adult';
-                        group.visible = true;
+                        group.scale.set(1, 1, 1);
                     } else {
-                        group.scale.setScalar(this.growthProgress);
-                        return;
+                        group.scale.setScalar(Math.max(0.15, this.growthProgress));
                     }
+                    return;
                 }
 
-                // Si es un árbol adulto, gestiona la generación de semillas periódicas
+                // 2. Generación de semillas periódicas en árboles adultos (cada ~30s)
                 if (this.state === 'adult') {
                     this.seedTimer += delta;
-                    if (this.seedTimer > 45) { // Cada ~45 segundos intenta plantar una semilla cerca
+                    if (this.seedTimer > 30) { 
                         this.seedTimer = 0;
-                        this.trySpawnSeed(scene, obstaclesList, allTreesList);
+                        this.trySpawnSeed(scene, obstaclesList, allObjectsList);
                     }
                 }
 
-                // Si se convirtió en tocón, espera un tiempo para retoñar
+                // 3. Sistema de retoño del tocón (retoña en 30 segundos si no se extrae)
                 if (this.state === 'stump') {
                     this.regrowthTimer += delta;
-                    if (this.regrowthTimer > 60) { // Si pasa 1 minuto y no se extrae el tocón, retoña
+                    if (this.regrowthTimer > 30) { 
                         this.regrowthTimer = 0;
-                        this.state = 'adult';
+                        this.state = 'sapling';
+                        this.growthProgress = 0.15;
                         this.health = 100;
-                        group.scale.set(1, 1, 1);
-                        group.visible = true;
+                        group.scale.setScalar(0.15);
+                        
+                        this.collider.radius = 0.18;
+                        this.collider.height = 0.6;
                     }
                 }
             },
 
-            // Lógica cuando el jugador lo tala por completo
-            chopDown(scene, obstaclesList) {
+            chopDown() {
                 if (this.state !== 'adult') return;
 
                 this.state = 'stump';
                 this.health = 0;
-                
-                // Reducir la malla visual a un simple tocón bajo en el suelo
-                group.scale.set(1, 0.2, 1); 
-                
-                // Reducir el colisionador para que el jugador pueda pasar por encima o cerca del tocón
-                this.collider.radius = 0.1;
+                this.regrowthTimer = 0;
+
+                group.scale.set(1, 0.25, 1);
+                this.collider.radius = 0.08;
                 this.collider.height = 0.15;
             },
 
-            // Generar un nuevo árbol (brote) en un radio aleatorio cercano sobre la esfera
-            trySpawnSeed(scene, obstaclesList, allTreesList) {
-                const normal = group.position.clone().normalize();
-                // Calcular una posición aleatoria cercana variando ligeramente los ángulos
-                const offsetTheta = (Math.random() - 0.5) * 0.1;
-                const offsetPhi = (Math.random() - 0.5) * 0.1;
-                
-                // Derivación sencilla de nueva posición en la esfera
-                const planetRadius = 5.0;
-                const currentPos = group.position.clone();
-                const newPos = currentPos.add(new THREE.Vector3(offsetTheta, 0, offsetPhi)).normalize().multiplyScalar(planetRadius);
+            trySpawnSeed(scene, obstaclesList, allObjectsList) {
+                let newPos = null;
+                let validPositionFound = false;
 
-                // Crear el nuevo árbol en estado de brote (sapling)
-                const newTreeData = TreeObject.create(newPos);
-                newTreeData.state = 'sapling';
-                newTreeData.growthProgress = 0.1;
-                newTreeData.mesh.scale.setScalar(0.1);
+                for (let attempt = 0; attempt < 5; attempt++) {
+                    const offsetTheta = (Math.random() - 0.5) * 0.2;
+                    const offsetPhi = (Math.random() - 0.5) * 0.2;
+                    
+                    const testPos = group.position.clone().add(new THREE.Vector3(offsetTheta, 0, offsetPhi)).normalize().multiplyScalar(5.0);
 
-                scene.add(newTreeData.mesh);
-                obstaclesList.push(newTreeData.collider);
-                allTreesList.push(newTreeData);
+                    // Evitar que se monten unos sobre otros comprobando la distancia mínima
+                    let tooClose = false;
+                    for (let i = 0; i < allObjectsList.length; i++) {
+                        if (allObjectsList[i].mesh && allObjectsList[i].mesh.position.distanceTo(testPos) < 0.6) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+
+                    if (!tooClose) {
+                        newPos = testPos;
+                        validPositionFound = true;
+                        break;
+                    }
+                }
+
+                if (validPositionFound && newPos) {
+                    const planetRadius = 5.0;
+                    const newTree = TreeObject.create(newPos, 'sapling', 0.1);
+                    newTree.mesh.scale.setScalar(0.1);
+
+                    scene.add(newTree.mesh);
+                    obstaclesList.push(newTree.collider);
+                    allObjectsList.push(newTree);
+                }
             }
         };
+
+        if (initialState === 'sapling') {
+            group.scale.setScalar(Math.max(0.15, initialProgress));
+        }
 
         return treeEntity;
     }
