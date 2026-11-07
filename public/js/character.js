@@ -1,18 +1,38 @@
-// Motor 3D de Selección y Creación con Posicionamiento Elevado
+// Motor 3D de Selección y Creación - Proporciones Consistentes y Atributos Escalables
 const CharacterModule = (() => {
     let scene, camera, renderer;
     let characterMeshes = []; 
     let classCreationMeshes = {}; 
     let selectedCharacterData = null;
     let isCreationMode = false;
-    let raycaster = new THREE.Raycaster();
-    let mouse = new THREE.Vector2();
     let currentClassIndex = 0;
 
+    // Clases con proporciones visuales definidas (radio, altura del cuerpo y atributos base)
     const classes = [
-        { id: 'guerrero', name: 'Guerrero', color: 0xff0033, stats: { str: 15, def: 12, spd: 8, agi: 7, mana: 5 } },
-        { id: 'mago', name: 'Mago', color: 0x0088ff, stats: { str: 5, def: 6, spd: 10, agi: 8, mana: 20 } },
-        { id: 'arquero', name: 'Arquero', color: 0x00ff66, stats: { str: 8, def: 8, spd: 14, agi: 15, mana: 10 } }
+        { 
+            id: 'guerrero', 
+            name: 'Guerrero', 
+            color: 0xff0033, 
+            radius: 0.32, 
+            height: 1.1, 
+            stats: { str: 15, def: 12, spd: 8, agi: 7, mana: 5 } 
+        },
+        { 
+            id: 'mago', 
+            name: 'Mago', 
+            color: 0x0088ff, 
+            radius: 0.28, 
+            height: 1.15, 
+            stats: { str: 5, def: 6, spd: 10, agi: 8, mana: 20 } 
+        },
+        { 
+            id: 'arquero', 
+            name: 'Arquero', 
+            color: 0x00ff66, 
+            radius: 0.26, 
+            height: 1.12, 
+            stats: { str: 8, def: 8, spd: 14, agi: 15, mana: 10 } 
+        }
     ];
 
     function init3D() {
@@ -22,7 +42,6 @@ const CharacterModule = (() => {
         scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x000000, 0.08);
 
-        // Cámara posicionada y apuntando más arriba para centrar el modelo en el canvas
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 2.7, 4.2);
         camera.lookAt(0, 1.2, 0);
@@ -31,7 +50,7 @@ const CharacterModule = (() => {
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
 
-        // Luces
+        // Iluminación
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
@@ -39,17 +58,17 @@ const CharacterModule = (() => {
         spotLight.position.set(0, 7, 4);
         scene.add(spotLight);
 
-        // Suelo / Pedestal Central Elevado
+        // Pedestal Central
         const floorGeo = new THREE.CylinderGeometry(2.2, 2.2, 0.2, 32);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.position.y = 0.5;
         scene.add(floor);
 
-        // Mallas de clase en el centro elevado
+        // Inicializar mallas de creación por clase respetando sus proporciones
         classes.forEach((c) => {
-            const group = createCharacterMesh(c.color, `${c.name.toUpperCase()}`);
-            group.position.set(0, 1.0, 0);
+            const group = createCharacterMesh(c.color, `${c.name.toUpperCase()}`, c.radius, c.height);
+            group.position.set(0, 0.6, 0);
             group.visible = false;
             scene.add(group);
             classCreationMeshes[c.id] = group;
@@ -60,23 +79,27 @@ const CharacterModule = (() => {
         animate();
     }
 
-    function createCharacterMesh(colorHex, labelText) {
+    // Crea el avatar con proporciones limpias y evita que el texto se encime con la cabeza
+    function createCharacterMesh(colorHex, labelText, radius = 0.3, height = 1.1) {
         const group = new THREE.Group();
         
-        const bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 16);
+        // Cuerpo proporcional
+        const bodyGeo = new THREE.CylinderGeometry(radius, radius, height, 16);
         const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
         const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = 0.6;
+        body.position.y = height / 2;
         group.add(body);
 
-        const headGeo = new THREE.SphereGeometry(0.22, 16, 16);
+        // Cabeza colocada exactamente arriba del cuerpo sin solaparse
+        const headGeo = new THREE.SphereGeometry(0.2, 16, 16);
         const headMat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
         const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = 1.4;
+        head.position.y = height + 0.25;
         group.add(head);
 
+        // Etiqueta flotante muy por encima de la cabeza para evitar atropellos visuales
         const labelSprite = createTransparentTextSprite(labelText);
-        labelSprite.position.set(0, 1.95, 0);
+        labelSprite.position.set(0, height + 0.65, 0);
         group.add(labelSprite);
 
         return group;
@@ -89,7 +112,7 @@ const CharacterModule = (() => {
         canvas.height = 128;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        ctx.font = 'bold 36px "Courier New", monospace';
+        ctx.font = 'bold 34px "Courier New", monospace';
         ctx.fillStyle = '#ffd700';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -104,6 +127,43 @@ const CharacterModule = (() => {
         return sprite;
     }
 
+    // Calcula atributos finales sumando nivel, equipo y efectos de estado
+    function calculateFinalStats(baseStats, level = 1, equipment = {}, statusEffects = []) {
+        let stats = {
+            str: baseStats.str + (level - 1) * 2,
+            def: baseStats.def + (level - 1) * 1.5,
+            spd: baseStats.spd + (level - 1) * 1,
+            agi: baseStats.agi + (level - 1) * 1.2,
+            mana: baseStats.mana + (level - 1) * 2
+        };
+
+        // Sumar bonificadores de equipamiento (si los tiene)
+        if (equipment) {
+            if (equipment.str) stats.str += equipment.str;
+            if (equipment.def) stats.def += equipment.def;
+            if (equipment.spd) stats.spd += equipment.spd;
+            if (equipment.agi) stats.agi += equipment.agi;
+            if (equipment.mana) stats.mana += equipment.mana;
+        }
+
+        // Aplicar efectos de estado activos (Buffs / Debuffs porcentuales o planos)
+        if (Array.isArray(statusEffects)) {
+            statusEffects.forEach(effect => {
+                if (effect.type === 'buff_str') stats.str += effect.value;
+                if (effect.type === 'buff_def') stats.def += effect.value;
+            });
+        }
+
+        // Retornar valores redondeados
+        return {
+            str: Math.round(stats.str),
+            def: Math.round(stats.def),
+            spd: Math.round(stats.spd),
+            agi: Math.round(stats.agi),
+            mana: Math.round(stats.mana)
+        };
+    }
+
     function renderUserCharacters3D(characterList) {
         characterMeshes.forEach(m => scene.remove(m));
         characterMeshes = [];
@@ -111,8 +171,8 @@ const CharacterModule = (() => {
         if (isCreationMode) return;
 
         characterList.forEach((char) => {
-            const classColor = char.classType === 'mago' ? 0x0088ff : (char.classType === 'arquero' ? 0x00ff66 : 0xff0033);
-            const meshGroup = createCharacterMesh(classColor, `${char.name} (Lv.${char.level || 1})`);
+            const classConfig = classes.find(c => c.id === char.classType) || classes[0];
+            const meshGroup = createCharacterMesh(classConfig.color, `${char.name} (Lv.${char.level || 1})`, classConfig.radius, classConfig.height);
             meshGroup.position.set(0, 0.6, 0);
             meshGroup.userData = char; 
             meshGroup.visible = false;
@@ -136,6 +196,21 @@ const CharacterModule = (() => {
         });
 
         const activeChar = characterMeshes[currentUserCharIndex].userData;
+        
+        // Si estamos mostrando un personaje existente, calculamos y mostramos sus atributos reales
+        if (activeChar) {
+            const baseClass = classes.find(c => c.id === activeChar.classType) || classes[0];
+            const finalStats = calculateFinalStats(baseClass.stats, activeChar.level || 1, activeChar.equipment, activeChar.statusEffects);
+            
+            if (document.getElementById('stat-str')) {
+                document.getElementById('stat-str').innerText = finalStats.str;
+                document.getElementById('stat-def').innerText = finalStats.def;
+                document.getElementById('stat-spd').innerText = finalStats.spd;
+                document.getElementById('stat-agi').innerText = finalStats.agi;
+                document.getElementById('stat-mana').innerText = finalStats.mana;
+            }
+        }
+
         if (window.onCharacter3DSelected) {
             window.onCharacter3DSelected(activeChar);
         }
@@ -186,11 +261,13 @@ const CharacterModule = (() => {
         const nameEl = document.getElementById('char-display-name');
         if (nameEl) nameEl.innerText = `CLASE: ${targetClass.name.toUpperCase()}`;
 
-        document.getElementById('stat-str').innerText = targetClass.stats.str;
-        document.getElementById('stat-def').innerText = targetClass.stats.def;
-        document.getElementById('stat-spd').innerText = targetClass.stats.spd;
-        document.getElementById('stat-agi').innerText = targetClass.stats.agi;
-        document.getElementById('stat-mana').innerText = targetClass.stats.mana;
+        // Al crear, mostramos los stats base de nivel 1 con el método escalable
+        const finalStats = calculateFinalStats(targetClass.stats, 1, {}, []);
+        document.getElementById('stat-str').innerText = finalStats.str;
+        document.getElementById('stat-def').innerText = finalStats.def;
+        document.getElementById('stat-spd').innerText = finalStats.spd;
+        document.getElementById('stat-agi').innerText = finalStats.agi;
+        document.getElementById('stat-mana').innerText = finalStats.mana;
 
         return targetClass;
     }
@@ -215,6 +292,7 @@ const CharacterModule = (() => {
         init3D,
         renderUserCharacters3D,
         setCreationMode,
+        calculateFinalStats,
         getCurrentClass: () => classes[currentClassIndex],
         nextClass: () => {
             if (isCreationMode) focusClass(currentClassIndex + 1);
