@@ -4,9 +4,14 @@ const WorldModule = (() => {
     let playerPos = { theta: 0, phi: Math.PI / 2 };
     const planetRadius = 5;
     const structures = [];
+    const obstacles = []; // <--- Almacén global de obstáculos para colisiones
     const textureLoader = new THREE.TextureLoader();
 
     function createPlanet(scene, worldConfig = {}) {
+        // Limpiar obstáculos anteriores si se recarga el mundo
+        obstacles.length = 0;
+        structures.length = 0;
+
         const groundTexture = worldConfig.textureUrl ? textureLoader.load(worldConfig.textureUrl) : null;
         if (groundTexture) {
             groundTexture.wrapS = THREE.RepeatWrapping;
@@ -53,12 +58,19 @@ const WorldModule = (() => {
             mesh.rotateX(Math.PI / 2);
 
             scene.add(mesh);
+
+            // <--- REGISTRAR CADA ÁRBOL Y ROCA COMO OBSTÁCULO SÓLIDO --->
+            obstacles.push({
+                position: mesh.position.clone(),
+                radius: 0.45,   // Radio de colisión horizontal
+                height: 0.7     // Altura que se puede saltar
+            });
         }
     }
 
     // Permitir construir cimientos en superficie (depth = 0) o subterráneos hacia abajo (depth = -1)
     function buildStructure(scene, theta, phi, depthLevel = 0) {
-        const currentRadius = planetRadius + (depthLevel * 0.3); // Si depthLevel es -1, baja hacia el núcleo
+        const currentRadius = planetRadius + (depthLevel * 0.3); 
         const x = currentRadius * Math.sin(phi) * Math.cos(theta);
         const y = currentRadius * Math.sin(phi) * Math.sin(theta);
         const z = currentRadius * Math.cos(phi);
@@ -76,6 +88,13 @@ const WorldModule = (() => {
 
         scene.add(structureMesh);
         structures.push(structureMesh);
+
+        // Registrar estructura construida como obstáculo
+        obstacles.push({
+            position: structureMesh.position.clone(),
+            radius: 0.5,
+            height: 0.4
+        });
     }
 
     function updatePlayerOnSphere(playerMesh, keys) {
@@ -109,6 +128,9 @@ const WorldModule = (() => {
         buildStructure,
         updatePlayerOnSphere,
         rotatePlanet,
-        getRadius: () => planetRadius
+        getRadius: () => planetRadius,
+        getObstacles: () => obstacles // <--- EXPONE LOS OBSTÁCULOS AL JUEGO
     };
 })();
+
+window.WorldModule = WorldModule;
