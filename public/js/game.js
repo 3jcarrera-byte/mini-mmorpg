@@ -16,7 +16,7 @@ const Game = {
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
         weaponRange: 15.0,
-        radius: 0.35 // Radio físico del jugador para colisiones
+        radius: 0.4 // Radio físico del jugador ensanchado ligeramente para evitar solapamientos
     },
     remotePlayers: {},
     keys: {},
@@ -26,9 +26,8 @@ const Game = {
     cameraMode: 'third', // 'first', 'third', 'rts'
     isAiming: false,
     
-    // Control de giro directo con el mouse
     crosshairOffset: { x: 0, y: 0 },
-    maxCrosshairRadius: 40, // Reducido para evitar exceso de juego en el giro
+    maxCrosshairRadius: 40,
 
     start(characterData) {
         if (characterData) {
@@ -139,13 +138,12 @@ const Game = {
             }
         });
 
-        // --- MOVIMIENTO DEL MOUSE OPTIMIZADO PARA GIRO FLUIDO ---
+        // --- MOVIMIENTO DEL MOUSE PARA GIRO FLUIDO ---
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.003;
                 const normal = this.localPlayer.position.clone().normalize();
                 
-                // Rotación directa del personaje y su dirección al mover el mouse
                 const yawDelta = -e.movementX * sensitivity;
                 this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
                 this.localPlayer.forward.normalize();
@@ -153,7 +151,6 @@ const Game = {
                 this.localPlayer.pitch -= e.movementY * sensitivity;
                 this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
 
-                // Restablecer ligero offset para evitar desvíos extraños en 3ª persona
                 this.crosshairOffset.x = 0;
                 this.crosshairOffset.y = 0;
             }
@@ -241,11 +238,10 @@ const Game = {
         }
     },
 
-    // --- DETECTOR DE COLISIONES SÓLIDO ---
+    // --- DETECTOR DE COLISIONES ROBUSTO (ÁRBOLES Y ROCAS) ---
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
-        // Soporta tanto getObstacles como colliders internos del mundo esférico
         let obstacles = [];
         if (typeof WorldModule.getObstacles === 'function') {
             obstacles = WorldModule.getObstacles();
@@ -259,16 +255,18 @@ const Game = {
 
         for (let i = 0; i < obstacles.length; i++) {
             const obs = obstacles[i];
-            const obsPos = obs.position || obs; // Soporta objeto con .position o Vector3 directo
+            const obsPos = obs.position || obs; 
             if (!obsPos) continue;
 
+            // Distancia directa en 3D sobre la superficie esférica
             const dist = nextPos.distanceTo(obsPos);
-            const obstacleRadius = obs.radius || 0.5;
-            const obstacleHeight = obs.height || 1.0;
+            const obstacleRadius = obs.radius || 0.45;
+            const obstacleHeight = obs.height || 0.8;
 
+            // Comprobación de choque horizontal y de altura (si no está saltando por encima)
             if (dist < (playerRadius + obstacleRadius)) {
                 if (currentAltitude < obstacleHeight) {
-                    return true; // Colisión detectada, bloquea el movimiento
+                    return true; // Colisión detectada: frena el movimiento
                 }
             }
         }
@@ -316,6 +314,7 @@ const Game = {
                 crosshair.style.transform = `translate(-50%, -50%) ${scale}`;
             }
 
+            // Calcular siguiente posición prevista
             const targetPos = p.position.clone();
             const tempForward = p.forward.clone();
 
@@ -335,7 +334,7 @@ const Game = {
 
             targetPos.normalize().multiplyScalar(R + p.altitude);
 
-            // Validación de colisiones activa antes de actualizar posición
+            // Validar si el movimiento choca con árboles/rocas antes de aplicarlo
             if (!this.checkCollision(targetPos, p.altitude)) {
                 p.position.copy(targetPos);
                 p.forward.copy(tempForward);
@@ -354,7 +353,7 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS CON RADIO Y ALCANCE PRECISOS ---
+            // --- GESTIÓN DE CÁMARAS ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
