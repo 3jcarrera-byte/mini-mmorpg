@@ -22,16 +22,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Notificar al servidor el inicio de sesión enviando usuario y clave
         socket.emit('auth:login', { username: user, password: pass }, (response) => {
-            if (response.success) {
+            console.log("Respuesta del servidor al loguear:", response);
+
+            if (response && response.success) {
                 currentUserCharacters = response.characters || [];
-                renderCharacterSlots(currentUserCharacters);
+                
+                // Cambiar a la pantalla de selección 3D
+                showScreen('screen-character');
                 
                 // Renderizar los personajes en la escena 3D (Estilo Albion)
                 CharacterModule.renderUserCharacters3D(currentUserCharacters);
-                
-                showScreen('screen-character');
             } else {
-                alert(response.message || 'Error de autenticación');
+                alert(response?.message || 'Error de autenticación');
             }
         });
     });
@@ -74,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-forgot-to-login').addEventListener('click', () => showScreen('screen-login'));
 
-    // --- 4. CREACIÓN Y SELECCIÓN DE PERSONAJES (ESTILO ALBION / MU) ---
+    // --- 4. CREACIÓN Y SELECCIÓN DE PERSONAJES (ESTILO ALBION 3D) ---
     document.getElementById('btn-to-create').addEventListener('click', () => {
         document.getElementById('panel-create-controls').style.display = 'flex';
         document.getElementById('btn-to-create').style.display = 'none';
@@ -113,23 +115,16 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.emit('character:create', { name, classType: selectedClass.id }, (res) => {
             if (res.success) {
                 currentUserCharacters = res.characters;
-                renderCharacterSlots(currentUserCharacters);
-                document.getElementById('btn-cancel-create').click(); // Limpiar UI y salir de modo creación
+                document.getElementById('btn-cancel-create').click(); // Limpiar UI, salir de modo creación y renderizar los 3D actualizados
             } else {
                 alert(res.message || 'Error al crear personaje.');
             }
         });
     });
 
-    // Listener global cuando haces clic directamente en un personaje 3D en el canvas
+    // Listener global cuando haces clic directamente en un personaje 3D en el canvas (Estilo Albion)
     window.onCharacter3DSelected = (char) => {
         selectedCharacter = char;
-        
-        // Sincronizar selección visual en los slots inferiores
-        const slots = document.querySelectorAll('.char-slot');
-        slots.forEach((slot, idx) => {
-            slot.classList.toggle('selected', currentUserCharacters[idx] && currentUserCharacters[idx].id === char.id);
-        });
 
         if (document.getElementById('panel-create-controls').style.display !== 'flex') {
             const playBtn = document.getElementById('btn-play');
@@ -137,37 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
             playBtn.innerText = `JUGAR CON ${char.name.toUpperCase()}`;
         }
     };
-
-    function renderCharacterSlots(list) {
-        const container = document.getElementById('character-list');
-        container.innerHTML = '';
-
-        // Renderizar 3 slots fijos estilo Mu/Albion
-        for (let i = 0; i < 3; i++) {
-            const char = list[i];
-            const div = document.createElement('div');
-
-            if (char) {
-                div.className = 'char-slot';
-                div.innerHTML = `<strong>${char.name}</strong><br><span style="font-size:9px; color:#ffd700;">Lv.${char.level || 1} ${char.classType.toUpperCase()}</span>`;
-                div.addEventListener('click', () => {
-                    document.querySelectorAll('.char-slot').forEach(s => s.classList.remove('selected'));
-                    div.classList.add('selected');
-                    selectedCharacter = char;
-
-                    if (document.getElementById('panel-create-controls').style.display !== 'flex') {
-                        const playBtn = document.getElementById('btn-play');
-                        playBtn.style.display = 'block';
-                        playBtn.innerText = `JUGAR CON ${char.name.toUpperCase()}`;
-                    }
-                });
-            } else {
-                div.className = 'char-slot empty';
-                div.innerText = `[ VACÍO ]`;
-            }
-            container.appendChild(div);
-        }
-    }
 
     // Entrar al Mapa Multijugador
     document.getElementById('btn-play').addEventListener('click', () => {
