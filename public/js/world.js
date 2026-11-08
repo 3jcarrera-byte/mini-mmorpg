@@ -3,17 +3,19 @@
 const WorldModule = (() => {
     let planetMesh;
     let oceanMesh;
+    let atmosphereMesh;
     let sunMesh, moonMesh;
     let celestialOrbitGroup;
     let currentRadius = 5; // Radio base configurable
-    let cachedScene = null; // Referencia a la escena para actualizar el fondo
     const obstacles = []; 
     const interactiveObjects = []; 
 
     function createPlanet(scene, worldConfig = {}) {
-        cachedScene = scene;
         obstacles.length = 0;
         interactiveObjects.length = 0;
+
+        // Fijar el fondo de la escena permanentemente al negro del espacio profundo
+        scene.background = new THREE.Color(0x020208);
 
         // Permitir personalizar el radio y tipo desde la configuración del mundo
         currentRadius = worldConfig.radius || 5;
@@ -36,6 +38,9 @@ const WorldModule = (() => {
         if (worldConfig.hasOcean !== false) {
             createOceanLayer(scene, worldConfig);
         }
+
+        // Crear la capa atmosférica (Techo atmosférico / Capa de ozono)
+        createAtmosphereLayer(scene, worldConfig);
 
         // Crear cuerpos celestes (Estrella y Luna)
         createCelestialBodies(scene);
@@ -104,6 +109,28 @@ const WorldModule = (() => {
 
         oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
         scene.add(oceanMesh);
+    }
+
+    // Crear la esfera atmosférica (Techo del planeta / Capa de ozono interactiva con la luz solar)
+    function createAtmosphereLayer(scene, worldConfig) {
+        const atmosphereRadius = currentRadius * 1.15; // Ligeramente flotando sobre la superficie
+        const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
+
+        const atmosColor = worldConfig.atmosphereColor || 0x75bbf9;
+
+        const atmosphereMat = new THREE.MeshStandardMaterial({
+            color: atmosColor,
+            roughness: 1.0,
+            metalness: 0.0,
+            transparent: true,
+            opacity: 0.25,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+
+        atmosphereMesh = new THREE.Mesh(atmosphereGeo, atmosphereMat);
+        scene.add(atmosphereMesh);
     }
 
     function createCelestialBodies(scene) {
@@ -193,7 +220,7 @@ const WorldModule = (() => {
         }
     }
 
-    function rotatePlanet(delta = 0.016, camera = null) {
+    function rotatePlanet(delta = 0.016) {
         if (planetMesh) {
             planetMesh.rotation.y += 0.001;
         }
@@ -204,33 +231,14 @@ const WorldModule = (() => {
             oceanMesh.rotation.x += 0.0002;
         }
 
+        // Deriva atmosférica independiente para dar dinamismo al techo de nubes/ozono
+        if (atmosphereMesh) {
+            atmosphereMesh.rotation.y += 0.0004;
+        }
+
         // Rotación de la órbita de los cuerpos celestes (Sol / Luna)
         if (celestialOrbitGroup) {
             celestialOrbitGroup.rotation.y += 0.0003;
-
-            // Transición lógica del cielo basada en la posición del jugador respecto al sol
-            if (cachedScene && sunMesh && planetMesh && camera) {
-                const sunWorldPos = new THREE.Vector3();
-                sunMesh.getWorldPosition(sunWorldPos);
-
-                const planetWorldPos = new THREE.Vector3();
-                planetMesh.getWorldPosition(planetWorldPos);
-
-                // Dirección del centro del planeta hacia el sol y hacia la cámara (jugador)
-                const sunDir = sunWorldPos.clone().sub(planetWorldPos).normalize();
-                const camDir = camera.position.clone().sub(planetWorldPos).normalize();
-
-                // Producto escalar: indica si la cámara está en el lado iluminado ( > 0 ) o en la sombra ( < 0 )
-                const alignment = camDir.dot(sunDir);
-
-                // Suavizar la transición entre noche y día alrededor del horizonte (terminator)
-                let mixFactor = THREE.MathUtils.smoothstep(alignment, -0.15, 0.25);
-
-                const nightSpaceColor = new THREE.Color(0x020208); // Negro espacio estelar
-                const daySkyColor     = new THREE.Color(0x75bbf9); // Azul cielo luminoso
-
-                cachedScene.background = new THREE.Color().lerpColors(nightSpaceColor, daySkyColor, mixFactor);
-            }
         }
     }
 
