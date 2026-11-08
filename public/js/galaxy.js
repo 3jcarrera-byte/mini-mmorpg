@@ -5,15 +5,11 @@ const GalaxyModule = (() => {
     let starSystems = [];
     let currentActivePlanetId = null;
 
-    /**
-     * Catálogo maestro de tipos de planetas con restricciones de tamaño (máx 12.0)
-     * y clasificación termodinámica por zonas orbitales (Inner, Habitable, Outer).
-     */
     const PLANET_ARCHETYPES = {
         VOLCANIC_MAGMA: {
             zone: "inner",
             name: "Planeta Volcánico",
-            radiusRange: [4.0, 7.0], // Máximo controlado <= 12.0
+            radiusRange: [4.0, 5.0],
             gravity: 12.0,
             atmosphereColor: 0xff4500,
             ozoneDensity: 0.20,
@@ -27,7 +23,7 @@ const GalaxyModule = (() => {
         DESERT_WASTELAND: {
             zone: "inner",
             name: "Planeta Desértico",
-            radiusRange: [4.5, 7.5],
+            radiusRange: [4.5, 6.0],
             gravity: 10.5,
             atmosphereColor: 0xffd700,
             ozoneDensity: 0.35,
@@ -39,9 +35,9 @@ const GalaxyModule = (() => {
             resources: [{ type: "sandstone_rock", density: 35, rarity: "common" }]
         },
         TEMPERATE_FOREST: {
-            zone: "habitable", // Zona de mayor densidad poblacional (Más habitables)
+            zone: "habitable",
             name: "Planeta Templado Boscoso",
-            radiusRange: [4.0, 6.5],
+            radiusRange: [4.0, 5.5],
             gravity: 9.8,
             atmosphereColor: 0x87ceeb,
             ozoneDensity: 0.65,
@@ -56,9 +52,9 @@ const GalaxyModule = (() => {
             ]
         },
         OCEANIC_WORLD: {
-            zone: "habitable", // Segunda opción habitable abundante
+            zone: "habitable",
             name: "Planeta Oceánico",
-            radiusRange: [4.5, 7.0],
+            radiusRange: [4.5, 6.0],
             gravity: 10.0,
             atmosphereColor: 0x00bfff,
             ozoneDensity: 0.50,
@@ -72,7 +68,7 @@ const GalaxyModule = (() => {
         FROZEN_ICE: {
             zone: "outer",
             name: "Planeta Helado",
-            radiusRange: [5.0, 8.5],
+            radiusRange: [5.0, 7.0],
             gravity: 8.5,
             atmosphereColor: 0xb0e0e6,
             ozoneDensity: 0.40,
@@ -86,7 +82,7 @@ const GalaxyModule = (() => {
         BARREN_COLOSSUS: {
             zone: "outer",
             name: "Coloso Exterior",
-            radiusRange: [8.0, 12.0], // El más grande del sistema pero estrictamente <= 12.0
+            radiusRange: [8.0, 12.0],
             gravity: 13.5,
             atmosphereColor: 0x708090,
             ozoneDensity: 0.15,
@@ -100,160 +96,98 @@ const GalaxyModule = (() => {
     };
 
     /**
-     * Genera la estructura completa de la galaxia asegurando distribución termodinámica
-     * y mayor proporción de mundos habitables por sistema estelar.
+     * Entorno de prueba controlado: 1 solo sistema estelar (sys_test_server) 
+     * con 1 sol central masivo y exactamente los 6 planetas arquetipo ordenados.
      */
     function generateGalaxyDataRegistry() {
         if (galaxyRegistry.length > 0) return galaxyRegistry;
 
-        const totalPlanetsTarget = 1000;
         starSystems = [];
         galaxyRegistry = [];
 
-        const systemPositions = [];
-        const minSystemDistance = 180.0;
+        const systemPosition = new THREE.Vector3(0, 0, 0); // Origen central para el servidor de pruebas
+        
+        // 1 sol central masivo
+        const suns = [{
+            color: 0xffd700,
+            radius: 18.0,
+            offset: new THREE.Vector3(0, 0, 0)
+        }];
+
+        const systemId = "sys_test_server";
+        const systemPlanets = [];
+        const planetTypes = [
+            "VOLCANIC_MAGMA", 
+            "DESERT_WASTELAND", 
+            "TEMPERATE_FOREST", 
+            "OCEANIC_WORLD", 
+            "FROZEN_ICE", 
+            "BARREN_COLOSSUS"
+        ];
+
+        let orbitalDistance = 45.0; // Distancia inicial fuera del radio del sol (18.0)
         let currentPlanetId = 1;
-        let sId = 1;
 
-        // Construcción iterativa de sistemas hasta alcanzar la cuota de 1,000 planetas
-        while (currentPlanetId <= totalPlanetsTarget) {
-            // Generación de coordenadas 3D para el Sistema Solar sin solapamiento
-            let pos, valid = false, attempts = 0;
-            do {
-                const u = Math.random();
-                const theta = Math.random() * 2.0 * Math.PI;
-                const phi = Math.acos(2.0 * Math.random() - 1.0);
-                const r = Math.cbrt(u) * 2000.0; 
+        planetTypes.forEach((pType, index) => {
+            orbitalDistance += 25.0; // Espaciado seguro entre órbitas
+            const archetype = PLANET_ARCHETYPES[pType];
+            const radius = archetype.radiusRange[0] + Math.random() * (archetype.radiusRange[1] - archetype.radiusRange[0]);
 
-                pos = new THREE.Vector3(
-                    r * Math.sin(phi) * Math.cos(theta),
-                    r * Math.sin(phi) * Math.sin(theta) * 0.2,
-                    r * Math.cos(phi)
-                );
-
-                valid = true;
-                for (let existingPos of systemPositions) {
-                    if (existingPos.distanceTo(pos) < minSystemDistance) {
-                        valid = false;
-                        break;
-                    }
-                }
-                attempts++;
-            } while (!valid && attempts < 50);
-
-            systemPositions.push(pos);
-
-            // Estrellas centrales masivas (1 a 3 soles) con tamaño de 16.0 a 20.0
-            const sunCount = Math.random() < 0.65 ? 1 : (Math.random() < 0.88 ? 2 : 3);
-            const suns = [];
-            for (let i = 0; i < sunCount; i++) {
-                suns.push({
-                    color: i === 0 ? 0xffd700 : (i === 1 ? 0xff4500 : 0x88ccff),
-                    radius: 16.0 + Math.random() * 4.0, // Rango estelar masivo corregido [16.0 - 20.0]
-                    offset: i === 0 ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3((Math.random() - 0.5) * 12, 0, (Math.random() - 0.5) * 12)
-                });
-            }
-
-            const systemId = `sys_${sId}`;
-            const systemPlanets = [];
-
-            // Arquitectura de 6 planetas por sistema con mayor peso en zonas habitables
-            // Orden termodinámico estricto: Caliente -> Templado (Habitables x2) -> Frío -> Masivo
-            const systemPlanetTypes = [
-                Math.random() < 0.5 ? "VOLCANIC_MAGMA" : "DESERT_WASTELAND", // 1. Interno (Caliente)
-                "DESERT_WASTELAND",                                         // 2. Transición interna
-                "TEMPERATE_FOREST",                                         // 3. Habitable principal
-                "OCEANIC_WORLD",                                            // 4. Habitable secundario
-                "FROZEN_ICE",                                               // 5. Externo frío
-                "BARREN_COLOSSUS"                                           // 6. Exterior masivo (<= 12.0)
-            ];
-
-            let orbitalDistance = 45.0; // Distancia inicial ajustada para evitar superposición con los soles gigantes (16-20)
-            systemPlanetTypes.forEach((pType, index) => {
-                if (currentPlanetId > totalPlanetsTarget) return;
-
-                orbitalDistance += 22.0 + Math.random() * 8.0;
-                const archetype = PLANET_ARCHETYPES[pType];
-                
-                // Calcular radio aleatorio dentro del rango permitido (nunca > 12.0)
-                const radius = archetype.radiusRange[0] + Math.random() * (archetype.radiusRange[1] - archetype.radiusRange[0]);
-
-                const planetData = {
-                    id: currentPlanetId,
-                    systemId: systemId,
-                    type: pType,
-                    radius: radius,
-                    orbitRadius: orbitalDistance,
-                    orbitalSpeed: 0.0001 + (Math.random() * 0.0003), // Velocidad de traslación atómica
-                    initialAngle: Math.random() * Math.PI * 2.0,    // Fase orbital inicial
-                    generationSeed: Math.floor(Math.random() * 100000),
-                    owner: null
-                };
-
-                galaxyRegistry.push(planetData);
-                systemPlanets.push(planetData);
-                currentPlanetId++;
-            });
-
-            starSystems.push({
+            const planetData = {
+                id: currentPlanetId,
                 systemId: systemId,
-                position: pos,
-                suns: suns,
-                planets: systemPlanets
-            });
+                type: pType,
+                radius: radius,
+                orbitRadius: orbitalDistance,
+                orbitalSpeed: 0.0001,
+                initialAngle: (index * Math.PI) / 3.0, // Distribución angular inicial uniforme
+                generationSeed: 12345 + index,
+                owner: null
+            };
 
-            sId++;
-        }
+            galaxyRegistry.push(planetData);
+            systemPlanets.push(planetData);
+            currentPlanetId++;
+        });
+
+        starSystems.push({
+            systemId: systemId,
+            position: systemPosition,
+            suns: suns,
+            planets: systemPlanets
+        });
 
         return galaxyRegistry;
     }
 
-    /**
-     * Procedural Generation by Demand: Carga el planeta activo del jugador,
-     * limpiando la memoria GPU, posicionando los soles y pasando el radio exacto a WorldModule.
-     */
     function loadPlanetScene(scene, planetId) {
-        if (galaxyRegistry.length === 0) {
-            generateGalaxyDataRegistry();
-        }
+        if (galaxyRegistry.length === 0) generateGalaxyDataRegistry();
 
         const planetData = galaxyRegistry.find(p => p.id === planetId);
-        if (!planetData) {
-            console.error(`Planeta con ID ${planetId} no encontrado en el registro galáctico.`);
-            return null;
-        }
+        if (!planetData) return null;
 
         currentActivePlanetId = planetId;
 
-        // Limpiar recursos y mallas del mundo anterior para evitar fugas de memoria
         if (typeof WorldModule !== 'undefined' && typeof WorldModule.destroyWorld === 'function') {
             WorldModule.destroyWorld(scene);
         }
 
-        // Encontrar el sistema estelar contenedor
         const starSystem = starSystems.find(sys => sys.systemId === planetData.systemId);
-        
-        // Renderizar soles centrales masivos (16.0 - 20.0) en el origen del sistema estelar
+
         if (starSystem && typeof SunModule !== 'undefined') {
             starSystem.suns.forEach(sunConfig => {
                 SunModule.create(scene, { 
                     radius: sunConfig.radius, 
                     color: sunConfig.color,
-                    position: { 
-                        x: starSystem.position.x + sunConfig.offset.x, 
-                        y: starSystem.position.y + sunConfig.offset.y, 
-                        z: starSystem.position.z + sunConfig.offset.z 
-                    } 
+                    position: sunConfig.offset 
                 });
             });
         }
 
-        // Instanciar el micro-planeta pasando explícitamente su radio dinámico y órbita global
         if (typeof WorldModule !== 'undefined' && typeof WorldModule.createPlanet === 'function') {
             const planetMesh = WorldModule.createPlanet(scene, planetData.type, 0, planetData.radius);
             
             if (planetMesh && starSystem) {
-                // Calcular la posición global 3D exacta basada en la ley de traslación atómica
                 const posX = starSystem.position.x + Math.cos(planetData.initialAngle) * planetData.orbitRadius;
                 const posZ = starSystem.position.z + Math.sin(planetData.initialAngle) * planetData.orbitRadius;
                 planetMesh.position.set(posX, starSystem.position.y, posZ);
@@ -265,22 +199,13 @@ const GalaxyModule = (() => {
         return null;
     }
 
-    function getGalaxyRegistry() {
-        if (galaxyRegistry.length === 0) generateGalaxyDataRegistry();
-        return galaxyRegistry;
-    }
-
-    function getStarSystems() {
-        if (starSystems.length === 0) generateGalaxyDataRegistry();
-        return starSystems;
-    }
-
     return {
         generateGalaxyDataRegistry,
         loadPlanetScene,
-        getGalaxyRegistry,
-        getStarSystems,
-        getActivePlanetId: () => currentActivePlanetId
+        getGalaxyRegistry: () => { if (galaxyRegistry.length === 0) generateGalaxyDataRegistry(); return galaxyRegistry; },
+        getStarSystems: () => { if (starSystems.length === 0) generateGalaxyDataRegistry(); return starSystems; },
+        getActivePlanetId: () => currentActivePlanetId,
+        PLANET_ARCHETYPES
     };
 })();
 
