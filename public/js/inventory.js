@@ -1,0 +1,190 @@
+// Módulo de Inventario Estético y Funcional por Slots (inventory.js)
+const InventoryModule = (() => {
+    const maxSlots = 20; // 4 filas x 5 columnas
+    let items = [
+        { id: 1, type: 'wood', name: 'Madera', count: 100, icon: '🪵', color: '#f39c12' },
+        { id: 2, type: 'stone', name: 'Piedra', count: 0, icon: '🪨', color: '#bdc3c7' }
+    ];
+
+    function init() {
+        createUI();
+    }
+
+    function createUI() {
+        if (document.getElementById('inventory-modal')) return;
+
+        const container = document.querySelector('.game-container') || document.body;
+
+        // 1. Botón Flotante Estilizado del Bolso
+        if (!document.getElementById('btn-inventory-toggle')) {
+            const btnToggle = document.createElement('button');
+            btnToggle.id = 'btn-inventory-toggle';
+            btnToggle.innerHTML = '🎒 BOLSO <span style="opacity: 0.7; font-size: 11px;">[B]</span>';
+            btnToggle.style.cssText = `
+                position: absolute; bottom: 25px; right: 25px; z-index: 50; 
+                padding: 12px 20px; background: linear-gradient(135deg, #111b21 0%, #080f14 100%); 
+                color: #00ffcc; border: 2px solid #00ffcc; cursor: pointer; 
+                border-radius: 8px; font-family: monospace; font-weight: bold; font-size: 13px;
+                box-shadow: 0 0 15px rgba(0,255,204,0.3), inset 0 0 10px rgba(0,255,204,0.1);
+                transition: all 0.2s ease;
+            `;
+            btnToggle.onclick = (e) => {
+                e.stopPropagation();
+                toggle();
+            };
+            container.appendChild(btnToggle);
+        }
+
+        // 2. Ventana Modal Principal (Estilo Panel Sci-Fi / RPG)
+        const modal = document.createElement('div');
+        modal.id = 'inventory-modal';
+        modal.style.cssText = `
+            display: none; position: absolute; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); width: 400px; 
+            background: rgba(10, 14, 20, 0.95); 
+            border: 2px solid #00ffcc; padding: 22px; color: #fff; 
+            z-index: 200; border-radius: 12px; font-family: monospace; 
+            box-shadow: 0 0 40px rgba(0,0,0,0.9), 0 0 20px rgba(0,255,204,0.2);
+            backdrop-filter: blur(6px);
+            pointer-events: auto; /* Asegura que reciba eventos de mouse */
+        `;
+        
+        modal.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid rgba(0,255,204,0.3); padding-bottom: 12px; margin-bottom: 18px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px;">🎒</span>
+                    <h3 style="margin: 0; color: #00ffcc; font-size: 16px; letter-spacing: 1.5px;">INVENTARIO DEL HÉROE</h3>
+                </div>
+                <button id="close-inv-btn" style="background: rgba(255,85,85,0.1); border: 1px solid #ff5555; color: #ff5555; width: 28px; height: 28px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s;">✕</button>
+            </div>
+
+            <!-- Cuadrícula de Slots -->
+            <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-height: 280px; overflow-y: auto; padding: 4px;">
+                <!-- Se llena dinámicamente -->
+            </div>
+
+            <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; display: flex; justify-content: space-between; font-size: 11px; color: #88a; ">
+                <span>Capacidad: <strong id="inv-capacity" style="color: #00ffcc;">2/20</strong> slots</span>
+                <span>Pulsa <strong style="color: #00ffcc;">[B]</strong> para cerrar</span>
+            </div>
+        `;
+        container.appendChild(modal);
+
+        // Evitar que los clics dentro del modal cierren o afecten el juego subyacente
+        modal.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        const closeBtn = modal.querySelector('#close-inv-btn');
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggle();
+        };
+
+        // Escuchar tecla B de forma global
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyB') {
+                toggle();
+            }
+        });
+
+        renderGrid();
+    }
+
+    function renderGrid() {
+        const gridContainer = document.getElementById('inventory-grid');
+        const capacityEl = document.getElementById('inv-capacity');
+        if (!gridContainer) return;
+
+        gridContainer.innerHTML = '';
+        let usedSlots = 0;
+
+        for (let i = 0; i < maxSlots; i++) {
+            const slotItem = items[i];
+            const slot = document.createElement('div');
+            
+            slot.style.cssText = `
+                aspect-ratio: 1; background: rgba(0, 0, 0, 0.4); 
+                border: 1px solid ${slotItem && slotItem.count > 0 ? 'rgba(0,255,204,0.4)' : 'rgba(255,255,255,0.08)'}; 
+                border-radius: 8px; display: flex; flex-direction: column; 
+                align-items: center; justify-content: center; position: relative; 
+                box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);
+            `;
+
+            if (slotItem && slotItem.count > 0) {
+                usedSlots++;
+                slot.innerHTML = `
+                    <span style="font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">${slotItem.icon}</span>
+                    <span style="position: absolute; bottom: 3px; right: 5px; font-size: 11px; color: ${slotItem.color}; font-weight: bold; background: rgba(5,10,15,0.85); padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">${slotItem.count}</span>
+                `;
+            } else {
+                slot.style.opacity = '0.3';
+            }
+
+            gridContainer.appendChild(slot);
+        }
+
+        if (capacityEl) capacityEl.innerText = `${usedSlots}/${maxSlots}`;
+    }
+
+    function toggle() {
+        const modal = document.getElementById('inventory-modal');
+        if (!modal) return;
+        const isOpen = modal.style.display === 'block';
+        
+        if (isOpen) {
+            modal.style.display = 'none';
+        } else {
+            // 🌟 Liberar el bloqueo del mouse (Pointer Lock) para permitir navegar en el menú
+            if (document.pointerLockElement) {
+                document.exitPointerLock();
+            }
+            renderGrid();
+            modal.style.display = 'block';
+        }
+    }
+
+    function addItem(type, amount) {
+        let existingItem = items.find(i => i.type === type);
+        if (existingItem) {
+            existingItem.count += amount;
+        } else if (items.length < maxSlots) {
+            const icons = { wood: '🪵', stone: '🪨' };
+            const colors = { wood: '#f39c12', stone: '#bdc3c7' };
+            items.push({
+                id: items.length + 1,
+                type: type,
+                name: type.charAt(0).toUpperCase() + type.slice(1),
+                count: amount,
+                icon: icons[type] || '📦',
+                color: colors[type] || '#ffffff'
+            });
+        }
+
+        renderGrid();
+
+        if (type === 'wood') {
+            const woodHud = document.getElementById('ui-wood');
+            if (woodHud) woodHud.innerText = getData().wood;
+        }
+    }
+
+    function getData() {
+        let woodItem = items.find(i => i.type === 'wood');
+        let stoneItem = items.find(i => i.type === 'stone');
+        return {
+            wood: woodItem ? woodItem.count : 0,
+            stone: stoneItem ? stoneItem.count : 0,
+            slotsUsed: items.filter(i => i.count > 0).length
+        };
+    }
+
+    return {
+        init,
+        toggle,
+        addItem,
+        getData
+    };
+})();
+
+window.InventoryModule = InventoryModule;
