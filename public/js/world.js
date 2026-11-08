@@ -50,7 +50,10 @@ const WorldModule = (() => {
 
         createAtmosphereLayer(config);
 
-        generateFeatures(planetMesh, config.resources || config.treeCount || 40, config.rockCount || 20);
+        // Solo generar vegetación y recursos si el planeta no es el Sol ni carece de ellos explícitamente
+        if (config.resources || config.treeCount || config.rockCount || planetTypeKey.includes("FOREST") || planetTypeKey.includes("OCEANIC") || planetTypeKey.includes("DESERT") || planetTypeKey.includes("FROZEN") || planetTypeKey.includes("VOLCANIC") || planetTypeKey.includes("COLOSSUS")) {
+            generateFeatures(planetMesh, config.resources || config.treeCount || 40, config.rockCount || 20);
+        }
         
         return planetMesh;
     }
@@ -209,7 +212,7 @@ const WorldModule = (() => {
         destroyWorld,
         rotatePlanet,
         updateEcosystem,
-        getPlanetMesh: () => planetMesh, // REQUISITO CLAVE PARA LAS FÍSICAS DE GAME.JS
+        getPlanetMesh: () => planetMesh,
         getRadius: () => currentRadius,
         getObstacles: () => obstacles,
         getInteractiveObjects: () => interactiveObjects,
