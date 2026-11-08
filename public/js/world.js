@@ -2,6 +2,7 @@
 
 const WorldModule = (() => {
     let planetMesh;
+    let oceanMesh;
     let sunMesh, moonMesh;
     let celestialOrbitGroup;
     let currentRadius = 5; // Radio base configurable
@@ -29,6 +30,11 @@ const WorldModule = (() => {
         planetMesh = new THREE.Mesh(planetGeo, planetMat);
         scene.add(planetMesh);
 
+        // Crear la capa de Océano o Magma si el mundo lo requiere
+        if (worldConfig.hasOcean !== false) {
+            createOceanLayer(scene, worldConfig);
+        }
+
         createCelestialBodies(scene);
         generateFeatures(scene, planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
         
@@ -40,7 +46,6 @@ const WorldModule = (() => {
         const positionAttribute = geometry.attributes.position;
         const colorAttribute = new THREE.BufferAttribute(new Float32Array(positionAttribute.count * 3), 3);
         
-        // Colores predeterminados de respaldo (Bosque Templado)
         const colors = worldConfig.colors || {
             low: 0x2e5a1e,
             mid: 0x4a7c36,
@@ -54,24 +59,46 @@ const WorldModule = (() => {
         for (let i = 0; i < positionAttribute.count; i++) {
             vertex.fromBufferAttribute(positionAttribute, i);
             const distanceFromCenter = vertex.length();
-            
-            // Factor de altura relativo al radio base
             const heightFactor = (distanceFromCenter - baseRadius);
 
             if (heightFactor < -0.1) {
-                color.setHex(colors.low);    // Zonas bajas / depresiones / valles
+                color.setHex(colors.low);
             } else if (heightFactor >= -0.1 && heightFactor < 0.2) {
-                color.setHex(colors.mid);    // Zonas medias / terreno principal
+                color.setHex(colors.mid);
             } else if (heightFactor >= 0.2 && heightFactor < 0.4) {
-                color.setHex(colors.high);   // Laderas / colinas rocosas
+                color.setHex(colors.high);
             } else {
-                color.setHex(colors.peak);   // Cumbres / picos altos o nieve
+                color.setHex(colors.peak);
             }
 
             colorAttribute.setXYZ(i, color.r, color.g, color.b);
         }
 
         geometry.setAttribute('color', colorAttribute);
+    }
+
+    // Crear la segunda esfera concéntrica para el Océano o Río de Lava
+    function createOceanLayer(scene, worldConfig) {
+        const oceanLevelFactor = worldConfig.oceanLevel || 0.96;
+        const oceanRadius = currentRadius * oceanLevelFactor;
+
+        const oceanGeo = new THREE.SphereGeometry(oceanRadius, 32, 32);
+        
+        // Detectar si es lava (por el color o tipo de planeta) o agua convencional
+        const isMagma = worldConfig.oceanColor === 0x3b0000 || worldConfig.name?.includes("Volcánico");
+
+        const oceanMat = new THREE.MeshStandardMaterial({
+            color: worldConfig.oceanColor || 0x1e90ff,
+            roughness: isMagma ? 0.2 : 0.1,
+            metalness: isMagma ? 0.8 : 0.1,
+            emissive: isMagma ? 0xff3300 : 0x000000,
+            emissiveIntensity: isMagma ? 0.5 : 0.0,
+            transparent: true,
+            opacity: 0.85
+        });
+
+        oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
+        scene.add(oceanMesh);
     }
 
     function createCelestialBodies(scene) {
@@ -162,6 +189,13 @@ const WorldModule = (() => {
         if (planetMesh) {
             planetMesh.rotation.y += 0.001;
         }
+
+        // Animación de movimiento/marejada para el océano o lava en sentido contrario o velocidad diferente
+        if (oceanMesh) {
+            oceanMesh.rotation.y -= 0.0006;
+            oceanMesh.rotation.x += 0.0002; // Sutil efecto de oleaje/flujo dinámico
+        }
+
         if (celestialOrbitGroup) {
             celestialOrbitGroup.rotation.y += 0.0002;
         }
