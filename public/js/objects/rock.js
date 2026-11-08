@@ -22,11 +22,15 @@ const RockObject = (() => {
         smallRock.position.set(0.15, 0.06, 0.1);
         group.add(smallRock);
 
-        // Alinear a la superficie esférica del planeta
+        // Posicionar en la superficie
         group.position.copy(position);
-        group.lookAt(0, 0, 0);
-        group.rotateX(Math.PI / 2);
-        group.position.addScaledVector(group.position.clone().normalize(), 0.04);
+
+        // 🌟 CORRECCIÓN DE ORIENTACIÓN: Alinear hacia afuera usando la normal de la esfera
+        const normal = position.clone().normalize();
+        group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+
+        // Desplazamiento leve opcional para asegurar que no se hundan
+        group.position.addScaledVector(normal, 0.02);
 
         const colliderRef = {
             position: group.position.clone(),
@@ -41,10 +45,9 @@ const RockObject = (() => {
             resourceAmount: 20,
             health: 100,
 
-            // Método update requerido por el bucle del ecosistema (estático en rocas, pero necesario por consistencia)
+            // Método update requerido por el bucle del ecosistema
             update(delta, scene, obstaclesList, allObjectsList) {
-                // Las rocas no crecen ni se mueven de forma autónoma por defecto, 
-                // pero mantener el método evita errores de llamada en el bucle principal.
+                // Las rocas no crecen ni se mueven de forma autónoma por defecto
             },
 
             // Método de minado / recolección
