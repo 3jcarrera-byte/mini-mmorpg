@@ -1,9 +1,8 @@
-// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Sol Amarillo Radiante y Ciclo Lunar
+// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Sol Amarillo Radiante, Ciclo Lunar y Piedras Optimizadas
 const WorldModule = (() => {
     let planetMesh;
     let sunMesh, moonMesh;
     let celestialOrbitGroup;
-    let playerPos = { theta: 0, phi: Math.PI / 4 };
     const planetRadius = 5;
     const structures = [];
     const obstacles = []; 
@@ -102,9 +101,8 @@ const WorldModule = (() => {
                     featureData = window.TreeObject.create(position, randomState, randomProgress);
                 }
             } else {
-                if (window.RockObject && typeof window.RockObject.create === 'function') {
-                    featureData = window.RockObject.create(position);
-                }
+                // 🌟 Creación de Piedras con 80% de reducción (escala 0.2) y lógica de dos estados
+                featureData = createOptimizedRock(position);
             }
 
             if (featureData) {
@@ -115,6 +113,57 @@ const WorldModule = (() => {
                 interactiveObjects.push(featureData);
             }
         }
+    }
+
+    // 🌟 Generador optimizado de Piedras (80% más pequeñas y ocultas al recogerse)
+    function createOptimizedRock(position) {
+        const group = new THREE.Group();
+        group.position.copy(position);
+
+        const normal = position.clone().normalize();
+        group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+
+        // Geometría de roca reducida 80% (Escala general 0.2)
+        const rockGeo = new THREE.DodecahedronGeometry(0.35, 1);
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x808588, roughness: 0.8, flatShading: true });
+        const mesh = new THREE.Mesh(rockGeo, rockMat);
+        mesh.scale.set(0.2, 0.2, 0.2); // Reducción exacta del 80% respecto al tamaño base
+        mesh.position.y = 0.04;
+        group.add(mesh);
+
+        const rockEntity = {
+            type: 'stone',
+            mesh: group,
+            isReady: true, // Estado 1: Lista para recoger
+            resourceAmount: 10,
+            respawnTimer: 0,
+            radius: 0.08,
+            height: 0.12,
+            mine() {
+                if (!this.isReady) return 0;
+                this.isReady = false;
+                this.respawnTimer = 20.0; // 20 segundos de reposición
+                
+                // Ocultar por completo la piedra (no se muestra estado recogido)
+                this.mesh.visible = false;
+                return this.resourceAmount;
+            },
+            respawn() {
+                this.isReady = true;
+                // Hacerla visible nuevamente en su tamaño completo
+                this.mesh.visible = true;
+            },
+            update(delta) {
+                if (!this.isReady) {
+                    this.respawnTimer -= delta;
+                    if (this.respawnTimer <= 0) {
+                        this.respawn();
+                    }
+                }
+            }
+        };
+
+        return rockEntity;
     }
 
     function rotatePlanet() {
