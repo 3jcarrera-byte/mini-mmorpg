@@ -14,7 +14,7 @@ const Game = {
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
-        yawOffset: 0, // 🌟 Desplazamiento lateral de cámara para el efecto Over-the-Shoulder
+        yawOffset: 0, // Desplazamiento lateral de cámara para el efecto Over-the-Shoulder
         weaponRange: 15.0,
         radius: 0.08 // Radio físico compacto ajustado al mínimo
     },
@@ -107,7 +107,7 @@ const Game = {
         window.addEventListener('keydown', e => {
             this.keys[e.code] = true;
 
-            // 🌟 Si el inventario está abierto y presionas teclas de movimiento, cerrar inventario y devolver pointer lock
+            // Si el inventario está abierto y presionas teclas de movimiento, cerrar inventario y devolver pointer lock
             const invModal = document.getElementById('inventory-modal');
             if (invModal && invModal.style.display === 'block') {
                 if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
@@ -136,7 +136,6 @@ const Game = {
         canvas.addEventListener('contextmenu', e => e.preventDefault());
         
         canvas.addEventListener('click', () => {
-            // Solo solicitar pointer lock si el inventario NO está abierto
             const invModal = document.getElementById('inventory-modal');
             if (!invModal || invModal.style.display !== 'block') {
                 canvas.requestPointerLock();
@@ -157,7 +156,7 @@ const Game = {
             }
         });
 
-        // 🌟 Control de mouse refinado para la cámara orbital y offset lateral
+        // Control de mouse refinado para la cámara orbital y offset lateral
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.003;
@@ -171,9 +170,9 @@ const Game = {
                 this.localPlayer.pitch -= e.movementY * sensitivity;
                 this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
 
-                // Si el mouse se mueve a la derecha (movementX > 0), la cámara se desplaza ligeramente a la izquierda (y viceversa)
+                // Desplazamiento lateral sutil según el movimiento horizontal
                 this.localPlayer.yawOffset += e.movementX * 0.001;
-                this.localPlayer.yawOffset = Math.max(-0.4, Math.min(0.4, this.localPlayer.yawOffset));
+                this.localPlayer.yawOffset = Math.max(-0.3, Math.min(0.3, this.localPlayer.yawOffset));
 
                 this.crosshairOffset.x = 0;
                 this.crosshairOffset.y = 0;
@@ -285,7 +284,7 @@ const Game = {
 
             if (targetEntity) {
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
-                if (distanceToTarget > 1.5) {
+                if (distanceToTarget > 1.8) {
                     console.log("Estás demasiado lejos del objeto.");
                     return;
                 }
@@ -446,7 +445,7 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS ORBITALES Y ARCO CIRCUNFERENCIAL ---
+            // --- GESTIÓN DE CÁMARAS ORBITALES (Arco cerrado y controlado) ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
@@ -460,20 +459,22 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'third') {
-                let baseDistance = this.isAiming ? 1.5 : 2.5;
-                let baseHeight = this.isAiming ? 0.8 : 1.0;
+                let baseDistance = this.isAiming ? 1.4 : 2.2;
+                let baseHeight = this.isAiming ? 0.7 : 0.9;
 
-                // 🌟 Movimiento vertical del mouse (pitch) mueve la cámara en porción de circunferencia (hacia la cabeza o los tobillos)
+                // 🌟 Arco cenital cerrado y acotado (evita que la cámara se abra demasiado)
+                const clampedPitch = Math.max(-0.5, Math.min(0.5, p.pitch));
                 const arcRadius = baseDistance;
-                const arcHeightOffset = Math.sin(p.pitch) * arcRadius * 0.5;
-                const arcBackOffset = Math.cos(p.pitch) * arcRadius;
+                const arcHeightOffset = Math.sin(clampedPitch) * arcRadius * 0.3;
+                const arcBackOffset = Math.cos(clampedPitch) * arcRadius;
 
                 let camPos = p.position.clone()
                     .add(normal.clone().multiplyScalar(baseHeight + arcHeightOffset))
                     .sub(p.forward.clone().multiplyScalar(arcBackOffset));
 
-                // 🌟 Desplazamiento lateral (Over-the-shoulder) según el movimiento horizontal del mouse
-                camPos.add(right.clone().multiplyScalar(p.yawOffset));
+                // 🌟 Desplazamiento lateral Over-the-shoulder sutil y cerrado
+                const clampedYawOffset = Math.max(-0.25, Math.min(0.25, p.yawOffset));
+                camPos.add(right.clone().multiplyScalar(clampedYawOffset));
                 
                 const camNormal = camPos.clone().normalize();
                 if (camPos.length() < R + 0.3) {
@@ -483,7 +484,7 @@ const Game = {
                 this.camera.position.copy(camPos);
 
                 const lookDir = p.forward.clone();
-                lookDir.applyAxisAngle(right, p.pitch * 0.5);
+                lookDir.applyAxisAngle(right, clampedPitch * 0.4);
                 const targetLookAt = camPos.clone().add(lookDir.multiplyScalar(p.weaponRange));
                 this.camera.lookAt(targetLookAt);
 
