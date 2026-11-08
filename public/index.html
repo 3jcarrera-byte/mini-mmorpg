@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini MMORPG </title>
+    <title>Mini MMORPG - Arena y Gloria</title>
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
@@ -15,7 +15,7 @@
         <div class="box">
             <h2>ARENA Y GLORIA</h2>
             <h3>INICIAR SESIÓN</h3>
-            <input type="text" id="login-username" placeholder="Usuario">
+            <input type="text" id="login-username" placeholder="Usuario" autocapitalize="off" spellcheck="false">
             <input type="password" id="login-password" placeholder="Contraseña">
             <button id="btn-login" class="btn-large">ENTRAR AL REINO</button>
             <button id="btn-to-register" class="btn-secondary">REGISTRARSE</button>
@@ -27,8 +27,8 @@
     <div id="screen-register" class="screen">
         <div class="box">
             <h2>CREAR CUENTA</h2>
-            <input type="text" id="reg-username" placeholder="Usuario">
-            <input type="email" id="reg-email" placeholder="Correo Electrónico">
+            <input type="text" id="reg-username" placeholder="Usuario" autocapitalize="off" spellcheck="false">
+            <input type="email" id="reg-email" placeholder="Correo Electrónico" autocapitalize="off" spellcheck="false">
             <input type="password" id="reg-password" placeholder="Contraseña">
             <button id="btn-register-submit" class="btn-large">REGISTRARSE</button>
             <button id="btn-back-to-login" class="btn-secondary">VOLVER AL LOGIN</button>
@@ -40,7 +40,7 @@
         <div class="box">
             <h2>RECUPERAR CLAVE</h2>
             <p style="font-size: 11px; color: #aaa;">Se enviará una solicitud de recuperación a soporte técnico.</p>
-            <input type="email" id="forgot-email" placeholder="Tu Correo Registrado">
+            <input type="email" id="forgot-email" placeholder="Tu Correo Registrado" autocapitalize="off" spellcheck="false">
             <button id="btn-send-support" class="btn-large">ENVIAR CORREO A SOPORTE</button>
             <button id="btn-forgot-to-login" class="btn-secondary">CANCELAR</button>
         </div>
@@ -80,7 +80,7 @@
 
             <!-- Controles de Creación de Personaje (Ocultos hasta pulsar Nuevo Héroe) -->
             <div id="panel-create-controls" class="creation-controls">
-                <input type="text" id="create-char-name" placeholder="Nombre del Héroe" maxlength="15">
+                <input type="text" id="create-char-name" placeholder="Nombre del Héroe" maxlength="15" autocapitalize="off" spellcheck="false">
                 <div style="display: flex; gap: 8px; width: 100%;">
                     <button id="btn-confirm-create" class="btn-large" style="background: #114411;">CREAR</button>
                     <button id="btn-cancel-create" class="btn-secondary" style="width: 40%; margin: 6px 0;">CANCELAR</button>
@@ -93,7 +93,6 @@
             <div class="box" style="width: 380px;">
                 <h3 style="color: #ff4444;">¡ADVERTENCIA DE BORRADO!</h3>
                 <p id="delete-warning-text" style="font-size: 12px; color: #ccc; margin-bottom: 15px; line-height: 1.4;"></p>
-                <input type="text" id="delete-confirm-input" placeholder="Escribe el nombre del héroe">
                 <input type="text" id="delete-confirm-input" placeholder="Escribe el nombre del héroe" autocapitalize="off" spellcheck="false">
                 <div style="display: flex; gap: 8px; margin-top: 15px;">
                     <button id="btn-confirm-delete" class="btn-danger">CONFIRMAR BORRADO</button>
@@ -109,14 +108,19 @@
             <canvas id="mapCanvas" width="800" height="600"></canvas>
             <div class="hud" style="display: flex; justify-content: space-between; align-items: center; width: 800px;">
                 <div>
-                    <span id="hud-char-name"></span> | HP: <span id="hud-hp">100/100</span>
+                    <span id="hud-char-name"></span> | HP: <span id="hud-hp">100/100</span> | Madera: <span id="ui-wood">100</span> | Modo: <span id="ui-build">WOOD</span>
                 </div>
                 <button id="btn-return-menu" class="btn-secondary" style="width: auto; padding: 4px 12px; margin: 0; font-size: 11px;">SALIR AL MENÚ</button>
             </div>
         </div>
     </div>
 
+    <!-- Orden estricto de scripts del ecosistema y control -->
+    <script src="js/objects/tree.js"></script>
+    <script src="js/objects/rock.js"></script>
     <script src="js/character.js"></script>
+    <script src="js/worldsConfig.js"></script>
+    <script src="js/world.js"></script>
     <script src="js/game.js"></script>
     <script src="js/app.js"></script>
 </body>
