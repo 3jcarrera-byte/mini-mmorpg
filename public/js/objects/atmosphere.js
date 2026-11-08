@@ -2,7 +2,7 @@
 
 const AtmosphereObject = (() => {
     function create(planetRadius, config = {}) {
-        const targetThickness = 4.5 * Math.sqrt(4.0 / planetRadius);
+        const targetThickness = 4.5 * Math.sqrt(2.0 / planetRadius);
         const atmosphereRadius = planetRadius + targetThickness;
 
         const geometry = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
