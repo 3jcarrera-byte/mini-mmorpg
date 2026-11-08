@@ -128,13 +128,17 @@ const Game = {
         this.localPlayer.altitude = 0;
         this.localPlayer.verticalVelocity = 0;
 
-        this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.alienRace, this.localPlayer.color);
+        // Instanciar el avatar a través del nuevo módulo PlayerAvatarModule
+        if (typeof PlayerAvatarModule !== 'undefined') {
+            this.localPlayer.mesh = PlayerAvatarModule.create(this.localPlayer.alienRace, this.localPlayer.color).mesh;
+        } else {
+            this.localPlayer.mesh = new THREE.Group();
+        }
         this.scene.add(this.localPlayer.mesh);
 
         const hudName = document.getElementById('hud-char-name');
         if (hudName) hudName.innerText = `${this.localPlayer.name} [${this.localPlayer.alienRace.toUpperCase()}] (Lv.${this.localPlayer.level})`;
 
-        // Inicializar la mira a través del módulo externo modular
         if (typeof CrosshairModule !== 'undefined') {
             CrosshairModule.init();
         }
@@ -161,26 +165,6 @@ const Game = {
         this.localPlayer.yawOffset -= e.movementX * sensitivity;
         this.localPlayer.pitch -= e.movementY * sensitivity;
         this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
-    },
-
-    createPlayerAvatar(alienRace, customColor) {
-        const group = new THREE.Group();
-        
-        const body = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.08, 0.08, 0.35, 8), 
-            new THREE.MeshStandardMaterial({ color: customColor })
-        );
-        body.position.y = 0.175;
-        group.add(body);
-
-        const head = new THREE.Mesh(
-            new THREE.SphereGeometry(0.07, 8, 8), 
-            new THREE.MeshStandardMaterial({ color: 0xffd700 })
-        );
-        head.position.y = 0.38;
-        group.add(head);
-
-        return group;
     },
 
     connectServer() {
@@ -353,7 +337,6 @@ const Game = {
             const planetGlobalCenter = new THREE.Vector3();
             if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
 
-            // Sincronización rotacional fluida con el planeta activo
             const planetRotationStep = 0.001;
             p.position.sub(planetGlobalCenter);
             p.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
@@ -361,7 +344,6 @@ const Game = {
 
             let normal = p.position.clone().sub(planetGlobalCenter).normalize();
 
-            // Construir base tangente estable basada en la normal y yawOffset
             const refVector = Math.abs(normal.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
             const tangentRight = new THREE.Vector3().crossVectors(normal, refVector).normalize();
             const tangentForward = new THREE.Vector3().crossVectors(tangentRight, normal).normalize();
@@ -390,7 +372,6 @@ const Game = {
                 p.verticalVelocity = 0;
             }
 
-            // Actualizar mira modularmente
             if (typeof CrosshairModule !== 'undefined') {
                 CrosshairModule.update(isMoving);
             }
