@@ -1,8 +1,13 @@
+// public/js/input.js
+
 const InputModule = (() => {
     const keys = {};
     let isAiming = false;
+    let isInitialized = false;
 
     function init(canvas) {
+        if (isInitialized) return;
+
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
 
@@ -17,40 +22,55 @@ const InputModule = (() => {
             }
 
             // Teclas 1, 2 y 3 para alternar cámaras de forma instantánea
-            if (e.code === 'Digit1' || e.code === 'Numpad1') {
-                Game.setCameraMode('first');
-            } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
-                Game.setCameraMode('third');
-            } else if (e.code === 'Digit3' || e.code === 'Numpad3') {
-                Game.setCameraMode('rts');
+            if (typeof GameModule !== 'undefined') {
+                if (e.code === 'Digit1' || e.code === 'Numpad1') {
+                    GameModule.setCameraMode('first');
+                } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
+                    GameModule.setCameraMode('third');
+                } else if (e.code === 'Digit3' || e.code === 'Numpad3') {
+                    GameModule.setCameraMode('rts');
+                }
             }
         });
 
-        window.addEventListener('keyup', e => keys[e.code] = false);
-
-        canvas.addEventListener('contextmenu', e => e.preventDefault());
-        
-        canvas.addEventListener('click', () => {
-            const invModal = document.getElementById('inventory-modal');
-            if (!invModal || invModal.style.display !== 'block') {
-                canvas.requestPointerLock();
-            }
+        window.addEventListener('keyup', e => {
+            keys[e.code] = false;
         });
 
-        canvas.addEventListener('mousedown', e => {
-            if (e.button === 2) isAiming = true;
-            else Game.handleBuildClick(e);
-        });
+        if (canvas) {
+            canvas.addEventListener('contextmenu', e => e.preventDefault());
+            
+            canvas.addEventListener('click', () => {
+                const invModal = document.getElementById('inventory-modal');
+                if (!invModal || invModal.style.display !== 'block') {
+                    canvas.requestPointerLock();
+                }
+            });
 
-        canvas.addEventListener('mouseup', e => {
-            if (e.button === 2) isAiming = false;
-        });
+            canvas.addEventListener('mousedown', e => {
+                if (e.button === 2) {
+                    isAiming = true;
+                } else if (typeof GameModule !== 'undefined' && typeof GameModule.handleBuildClick === 'function') {
+                    GameModule.handleBuildClick(e);
+                }
+            });
+
+            canvas.addEventListener('mouseup', e => {
+                if (e.button === 2) {
+                    isAiming = false;
+                }
+            });
+        }
 
         document.addEventListener('mousemove', e => {
-            if (document.pointerLockElement === canvas) {
-                Game.handleMouseMove(e);
+            if (canvas && document.pointerLockElement === canvas) {
+                if (typeof GameModule !== 'undefined' && typeof GameModule.handleMouseMove === 'function') {
+                    GameModule.handleMouseMove(e);
+                }
             }
         });
+
+        isInitialized = true;
     }
 
     return {
@@ -59,4 +79,5 @@ const InputModule = (() => {
         isAiming: () => isAiming
     };
 })();
+
 window.InputModule = InputModule;
