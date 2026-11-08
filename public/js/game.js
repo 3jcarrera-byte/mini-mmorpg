@@ -235,7 +235,7 @@ const Game = {
         });
     },
 
-    // --- INTERACCIÓN DE TALA Y MINADO CON VERIFICACIÓN DE DISTANCIA ---
+    // --- INTERACCIÓN DE TALA Y MINADO CON VERIFICACIÓN DE DISTANCIA ROBUSTA ---
     handleBuildClick(e) {
         if (e.button !== 0) return; // Solo clic izquierdo
 
@@ -250,13 +250,16 @@ const Game = {
         const intersects = raycaster.intersectObjects(meshes, true);
 
         if (intersects.length > 0) {
-            let hitMesh = intersects[0].object;
-            
-            while (hitMesh.parent && !interactiveObjects.some(obj => obj.mesh === hitMesh)) {
-                hitMesh = hitMesh.parent;
-            }
+            let hitObject = intersects[0].object;
+            let targetEntity = null;
 
-            const targetEntity = interactiveObjects.find(obj => obj.mesh === hitMesh);
+            // Subir por la jerarquía de padres de manera segura para encontrar la entidad interactiva
+            let currentObj = hitObject;
+            while (currentObj) {
+                targetEntity = interactiveObjects.find(obj => obj.mesh === currentObj);
+                if (targetEntity) break;
+                currentObj = currentObj.parent;
+            }
 
             if (targetEntity) {
                 // 🌟 VALIDACIÓN DE DISTANCIA (Máximo 1.5 unidades para recolectar/atacar)
@@ -267,20 +270,21 @@ const Game = {
                 }
 
                 if (typeof targetEntity.chopDown === 'function' && targetEntity.state === 'adult') {
+                    const amount = targetEntity.resourceAmount || 15;
                     targetEntity.chopDown();
                     
-                    // 🌟 Delega la adición de madera al Módulo de Inventario
                     if (typeof InventoryModule !== 'undefined') {
-                        InventoryModule.addItem('wood', targetEntity.resourceAmount);
+                        InventoryModule.addItem('wood', amount);
                     }
+                    console.log(`Madera recolectada: ${amount}`);
                 } 
                 else if (typeof targetEntity.mine === 'function' && targetEntity.health > 0) {
                     const gainedStone = targetEntity.mine();
                     
-                    // 🌟 Delega la adición de piedra al Módulo de Inventario
-                    if (typeof InventoryModule !== 'undefined') {
+                    if (gainedStone > 0 && typeof InventoryModule !== 'undefined') {
                         InventoryModule.addItem('stone', gainedStone);
                     }
+                    console.log(`Piedra recolectada: ${gainedStone}`);
                 }
             }
         }
