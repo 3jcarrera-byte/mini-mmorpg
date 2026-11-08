@@ -193,7 +193,7 @@ const WorldModule = (() => {
         }
     }
 
-    function rotatePlanet(delta = 0.016) {
+    function rotatePlanet(delta = 0.016, camera = null) {
         if (planetMesh) {
             planetMesh.rotation.y += 0.001;
         }
@@ -208,16 +208,23 @@ const WorldModule = (() => {
         if (celestialOrbitGroup) {
             celestialOrbitGroup.rotation.y += 0.0003;
 
-            // Transición dinámica del cielo (Día azul / Noche espacial) basada en la posición del sol
-            if (cachedScene && sunMesh) {
+            // Transición lógica del cielo basada en la posición del jugador respecto al sol
+            if (cachedScene && sunMesh && planetMesh && camera) {
                 const sunWorldPos = new THREE.Vector3();
                 sunMesh.getWorldPosition(sunWorldPos);
 
-                // Altura Y del sol en el mundo
-                const sunHeight = sunWorldPos.y;
-                
-                // Mapear la altura del sol a un factor de mezcla (0 = Noche profunda, 1 = Día despejado)
-                let mixFactor = THREE.MathUtils.clamp((sunHeight + 5) / 15, 0, 1);
+                const planetWorldPos = new THREE.Vector3();
+                planetMesh.getWorldPosition(planetWorldPos);
+
+                // Dirección del centro del planeta hacia el sol y hacia la cámara (jugador)
+                const sunDir = sunWorldPos.clone().sub(planetWorldPos).normalize();
+                const camDir = camera.position.clone().sub(planetWorldPos).normalize();
+
+                // Producto escalar: indica si la cámara está en el lado iluminado ( > 0 ) o en la sombra ( < 0 )
+                const alignment = camDir.dot(sunDir);
+
+                // Suavizar la transición entre noche y día alrededor del horizonte (terminator)
+                let mixFactor = THREE.MathUtils.smoothstep(alignment, -0.15, 0.25);
 
                 const nightSpaceColor = new THREE.Color(0x020208); // Negro espacio estelar
                 const daySkyColor     = new THREE.Color(0x75bbf9); // Azul cielo luminoso
