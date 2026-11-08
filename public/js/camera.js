@@ -18,13 +18,13 @@ const CameraModule = (() => {
             camera.lookAt(targetLookAt);
 
         } else if (cameraMode === 'third') {
-            // 🌟 Cámara 2 (CODM): Límite inferior más restrictivo para que la mirilla no baje tanto
-            // Si quieres que baje menos, acerca el primer valor a 0 (ej: -0.1 o 0.0)
-            const codmPitch = Math.max(-0.1, Math.min(0.8, player.pitch));
-            
+            // 🌟 Cámara 2: Tercera persona (Estilo CODM) -> Límite inferior extendido para que baje mucho más
             const baseDistance = 1.2; 
             const baseHeight = 1;
             const codmYawOffset = 0.16; 
+
+            // Ampliamos el rango inferior (primer valor más negativo, ej: -1.0) para que la mirilla baje hasta el suelo/pies
+            const codmPitch = Math.max(-1.0, Math.min(0.6, player.pitch));
             const pitchOffset = Math.sin(codmPitch) * 0.2;
 
             let camPos = player.position.clone()
@@ -45,12 +45,12 @@ const CameraModule = (() => {
             camera.lookAt(lookTarget);
 
         } else if (cameraMode === 'rts') {
-            // 🌟 Cámara 3 (Warcraft/RTS): Límite SUPERIOR muy bajo para que la mirilla no pueda subir casi nada
-            // Cambia el 0.0 o -0.1 para restringir drásticamente que suba la vista
-            const rtsPitch = Math.max(-1.2, Math.min(-0.1, player.pitch));
-
+            // 🌟 Cámara 3: Tipo Warcraft / RTS -> Límite inferior más alto (frena donde marcaste con la línea roja)
             const rtsHeight = 2.8; 
             const rtsBack = 2.5;   
+            
+            // Limitamos para que no baje tanto (primer valor en -0.3 o -0.2 para que se detenga a la altura del personaje)
+            const rtsPitch = Math.max(-0.35, Math.min(0.6, player.pitch));
 
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(rtsHeight))
