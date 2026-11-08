@@ -9,13 +9,14 @@ const SunModule = (() => {
         // Limpiar cualquier sol previo para evitar duplicados en la escena
         destroy(scene);
 
-        const radius = options.radius || 4.0;
+        // Rango estelar masivo (16.0 a 20.0)
+        const radius = options.radius || 18.0;
         const position = options.position || { x: 0, y: 0, z: 0 };
 
-        // El Sol se ubica en el centro del sistema estelar
+        // El Sol se ubica en el centro del sistema estelar con una escala imponente
         const sunGeo = new THREE.SphereGeometry(radius, 32, 32);
         
-        // Material con emisión alta para que actúe como una estrella brillante real
+        // Material brillante puro basado en emisión / color estelar
         const sunMat = new THREE.MeshBasicMaterial({ 
             color: options.color || 0xffea00
         });
@@ -24,13 +25,13 @@ const SunModule = (() => {
         sunMesh.position.set(position.x, position.y, position.z);
         scene.add(sunMesh);
 
-        // Luz puntual o direccional masiva que irradia luz y calor hacia todo el sistema
-        sunLight = new THREE.PointLight(0xffffff, 2.5, 1500, 0.5);
+        // Luz puntual o direccional con mayor alcance para iluminar los mundos distantes
+        sunLight = new THREE.PointLight(0xffffff, 3.0, 3000, 0.4);
         sunLight.position.set(0, 0, 0);
         sunMesh.add(sunLight);
 
-        // Luz ambiental base para el espacio profundo y las zonas oscuras de los planetas
-        ambientLight = new THREE.AmbientLight(0x222244, 0.3);
+        // Luz ambiental base para el espacio profundo y las zonas nocturnas de los planetas
+        ambientLight = new THREE.AmbientLight(0x222244, 0.35);
         scene.add(ambientLight);
 
         return sunMesh;
