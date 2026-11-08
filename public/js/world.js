@@ -12,12 +12,16 @@ const WorldModule = (() => {
         obstacles.length = 0;
         interactiveObjects.length = 0;
 
-        // Permitir personalizar el radio desde la configuración del mundo o usar el valor por defecto
+        // Permitir personalizar el radio y tipo desde la configuración del mundo
         currentRadius = worldConfig.radius || 5;
 
         const planetGeo = new THREE.SphereGeometry(currentRadius, 32, 32);
+        
+        // Aplicar paleta de colores por elevación y microbiomas basados en el tipo de planeta
+        applyProceduralBiomesAndElevation(planetGeo, currentRadius, worldConfig);
+
         const planetMat = new THREE.MeshStandardMaterial({ 
-            color: worldConfig.color || 0x1a4314, 
+            vertexColors: true, // Permite usar los colores asignados por vértice
             roughness: 0.8,
             flatShading: true 
         });
@@ -29,6 +33,45 @@ const WorldModule = (() => {
         generateFeatures(scene, planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
         
         return planetMesh;
+    }
+
+    // Lógica para asignar colores a los vértices según su altura (Elevación y Microbiomas)
+    function applyProceduralBiomesAndElevation(geometry, baseRadius, worldConfig) {
+        const positionAttribute = geometry.attributes.position;
+        const colorAttribute = new THREE.BufferAttribute(new Float32Array(positionAttribute.count * 3), 3);
+        
+        // Colores predeterminados de respaldo (Bosque Templado)
+        const colors = worldConfig.colors || {
+            low: 0x2e5a1e,
+            mid: 0x4a7c36,
+            high: 0x8a8a8a,
+            peak: 0xffffff
+        };
+
+        const vertex = new THREE.Vector3();
+        const color = new THREE.Color();
+
+        for (let i = 0; i < positionAttribute.count; i++) {
+            vertex.fromBufferAttribute(positionAttribute, i);
+            const distanceFromCenter = vertex.length();
+            
+            // Factor de altura relativo al radio base
+            const heightFactor = (distanceFromCenter - baseRadius);
+
+            if (heightFactor < -0.1) {
+                color.setHex(colors.low);    // Zonas bajas / depresiones / valles
+            } else if (heightFactor >= -0.1 && heightFactor < 0.2) {
+                color.setHex(colors.mid);    // Zonas medias / terreno principal
+            } else if (heightFactor >= 0.2 && heightFactor < 0.4) {
+                color.setHex(colors.high);   // Laderas / colinas rocosas
+            } else {
+                color.setHex(colors.peak);   // Cumbres / picos altos o nieve
+            }
+
+            colorAttribute.setXYZ(i, color.r, color.g, color.b);
+        }
+
+        geometry.setAttribute('color', colorAttribute);
     }
 
     function createCelestialBodies(scene) {
@@ -101,10 +144,9 @@ const WorldModule = (() => {
 
                 if (featureData) {
                     if (featureData.mesh) {
-                        // Asegurar que el objeto mire hacia afuera desde el centro de la esfera
                         featureData.mesh.position.copy(position);
                         featureData.mesh.lookAt(planetMesh.position);
-                        featureData.mesh.rotateX(Math.PI / 2); // Ajuste de orientación local si el modelo lo requiere
+                        featureData.mesh.rotateX(Math.PI / 2);
                         containerMesh.add(featureData.mesh);
                     }
                     if (featureData.collider && featureData.collider.active !== false) {
