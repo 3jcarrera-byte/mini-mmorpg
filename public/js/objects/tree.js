@@ -44,7 +44,6 @@ const TreeObject = (() => {
             mesh: group,
             collider: colliderRef,
             resourceType: 'wood',
-            resourceAmount: 15,
             
             state: initialState, // 'sapling', 'adult', 'stump'
             growthProgress: initialProgress,
@@ -52,9 +51,16 @@ const TreeObject = (() => {
             regrowthTimer: 0,
             seedTimer: 0,
 
+            // 🌟 Cantidad de madera dinámica basada en el progreso de crecimiento (desde 1 hasta 15)
+            get resourceAmount() {
+                if (this.state === 'adult') return 15;
+                // Escala progresiva de 1 a 15 según el crecimiento actual
+                return Math.max(1, Math.floor(this.growthProgress * 15));
+            },
+
             update(delta, scene, obstaclesList, allObjectsList) {
-                // 🌟 Tiempo de crecimiento exacto de 10 minutos (600 segundos)
-                const growthDuration = 10 * 60; 
+                // 🌟 Tiempo de crecimiento exacto de 1 minuto (60 segundos)
+                const growthDuration = 60; 
 
                 if (this.state === 'sapling') {
                     this.growthProgress += delta / growthDuration; 
@@ -66,7 +72,7 @@ const TreeObject = (() => {
                         group.children.forEach(child => child.visible = true);
                     } else {
                         // Crecimiento gradual manteniendo estructura visible
-                        const currentScale = Math.max(0.3, window.THREE ? this.growthProgress : this.growthProgress);
+                        const currentScale = Math.max(0.3, this.growthProgress);
                         group.scale.setScalar(currentScale);
                     }
                     return;
@@ -97,7 +103,8 @@ const TreeObject = (() => {
             },
 
             chopDown() {
-                if (this.state !== 'adult') return;
+                // Permitir talar incluso si está creciendo para obtener la madera proporcional recolectada hasta el momento
+                if (this.state === 'stump') return;
 
                 this.state = 'stump';
                 this.health = 0;
@@ -140,8 +147,8 @@ const TreeObject = (() => {
                 }
 
                 if (validPositionFound && newPos) {
-                    const newTree = create(newPos, 'sapling', 0.3);
-                    newTree.mesh.scale.setScalar(0.3);
+                    const newTree = create(newPos, 'sapling', 0.2);
+                    newTree.mesh.scale.setScalar(0.2);
 
                     if (scene && typeof scene.add === 'function') {
                         scene.add(newTree.mesh);
