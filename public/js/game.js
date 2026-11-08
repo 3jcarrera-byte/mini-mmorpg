@@ -7,7 +7,6 @@ const Game = {
         jumpSpeed: 0.08,    
         verticalVelocity: 0, 
         altitude: 0,         
-        wood: 100, 
         name: 'Héroe', 
         level: 1, 
         classType: 'guerrero', 
@@ -16,7 +15,13 @@ const Game = {
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
         weaponRange: 15.0,
-        radius: 0.08 // Radio físico compacto ajustado al mínimo
+        radius: 0.08, // Radio físico compacto ajustado al mínimo
+        // 🌟 Contenedor / Bolso de inventario integrado
+        inventory: {
+            wood: 100,
+            stone: 0,
+            maxSlots: 20
+        }
     },
     remotePlayers: {},
     keys: {},
@@ -72,13 +77,10 @@ const Game = {
         this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
         this.renderer.setSize(800, 600);
 
-        // Iluminación (Sol lateral fijo para que alumbre de un solo lado mientras el planeta gira)
+        // Iluminación general y ambiental suave
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-        const sun = new THREE.DirectionalLight(0xffd700, 1.4);
-        sun.position.set(15, 20, 15);
-        this.scene.add(sun);
 
-        // --- CREAR EL PLANETA ESFÉRICO ---
+        // --- CREAR EL PLANETA ESFÉRICO (Incluye Sol y ciclo lunar en world.js) ---
         WorldModule.createPlanet(this.scene, { color: 0x1a4314, treeCount: 40, rockCount: 20 });
         if (typeof WorldModule.getRadius === 'function') {
             this.planetRadius = WorldModule.getRadius();
@@ -207,7 +209,6 @@ const Game = {
     createPlayerAvatar(classType, customColor) {
         const group = new THREE.Group();
         
-        // 🌟 Avatar escalado a un tamaño compacto y estético
         const body = new THREE.Mesh(
             new THREE.CylinderGeometry(0.08, 0.08, 0.35, 8), 
             new THREE.MeshStandardMaterial({ color: customColor })
@@ -229,11 +230,11 @@ const Game = {
         this.socket = io();
         this.socket.on('initWorld', (data) => {
             const woodEl = document.getElementById('ui-wood');
-            if (woodEl) woodEl.innerText = this.localPlayer.wood;
+            if (woodEl) woodEl.innerText = this.localPlayer.inventory.wood;
         });
     },
 
-    // --- INTERACCIÓN DE TALA Y MINADO MEDIANTE RAYCASTING ---
+    // --- INTERACCIÓN DE TALA Y MINADO CON VERIFICACIÓN DE DISTANCIA ---
     handleBuildClick(e) {
         if (e.button !== 0) return; // Solo clic izquierdo
 
@@ -257,15 +258,24 @@ const Game = {
             const targetEntity = interactiveObjects.find(obj => obj.mesh === hitMesh);
 
             if (targetEntity) {
+                // 🌟 VALIDACIÓN DE DISTANCIA (Máximo 1.5 unidades para recolectar/atacar)
+                const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
+                if (distanceToTarget > 1.5) {
+                    console.log("Estás demasiado lejos del objeto.");
+                    return;
+                }
+
                 if (typeof targetEntity.chopDown === 'function' && targetEntity.state === 'adult') {
                     targetEntity.chopDown();
-                    this.localPlayer.wood += targetEntity.resourceAmount;
+                    this.localPlayer.inventory.wood += targetEntity.resourceAmount;
                     
                     const woodEl = document.getElementById('ui-wood');
-                    if (woodEl) woodEl.innerText = this.localPlayer.wood;
+                    if (woodEl) woodEl.innerText = this.localPlayer.inventory.wood;
                 } 
                 else if (typeof targetEntity.mine === 'function' && targetEntity.health > 0) {
-                    targetEntity.mine();
+                    const gainedStone = targetEntity.mine();
+                    this.localPlayer.inventory.stone += gainedStone;
+                    console.log(`Piedra añadida al bolso: ${gainedStone}. Total piedra: ${this.localPlayer.inventory.stone}`);
                 }
             }
         }
@@ -284,7 +294,7 @@ const Game = {
 
         if (!obstacles || obstacles.length === 0) return false;
 
-        const playerRadius = this.localPlayer.radius; // 0.08
+        const playerRadius = this.localPlayer.radius;
 
         for (let i = 0; i < obstacles.length; i++) {
             const obs = obstacles[i];
@@ -320,7 +330,7 @@ const Game = {
         const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1);
         this.lastFrameTime = now;
 
-        // 1. Rotar levemente el planeta
+        // 1. Rotar planeta y ciclo de astros celestes (Sol y Luna)
         if (typeof WorldModule.rotatePlanet === 'function') {
             WorldModule.rotatePlanet();
         }
