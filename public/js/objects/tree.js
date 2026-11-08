@@ -1,6 +1,7 @@
-// public/js/objects/tree.js
-const TreeObject = {
-    create(position, initialState = 'adult', initialProgress = 1.0) {
+// Módulo Modularizado de Árboles (TreeObject)
+const TreeObject = (() => {
+
+    function create(position, initialState = 'sapling', initialProgress = 0.2) {
         const group = new THREE.Group();
         
         // Tronco
@@ -49,37 +50,37 @@ const TreeObject = {
             seedTimer: 0,
 
             update(delta, scene, obstaclesList, allObjectsList) {
-                // 1. Crecimiento activo de brote a adulto en 60 segundos (1 min)
+                // 1. Crecimiento de brote a adulto (Acelerado a 5 segundos para pruebas visuales inmediatas)
                 if (this.state === 'sapling') {
-                    this.growthProgress += delta / 60.0; 
+                    this.growthProgress += delta / 5.0; 
                     if (this.growthProgress >= 1.0) {
                         this.growthProgress = 1.0;
                         this.state = 'adult';
                         group.scale.set(1, 1, 1);
                     } else {
-                        group.scale.setScalar(Math.max(0.15, this.growthProgress));
+                        group.scale.setScalar(Math.max(0.2, this.growthProgress));
                     }
                     return;
                 }
 
-                // 2. Generación de semillas periódicas en árboles adultos (cada ~30s)
+                // 2. Generación de semillas en árboles adultos
                 if (this.state === 'adult') {
                     this.seedTimer += delta;
-                    if (this.seedTimer > 30) { 
+                    if (this.seedTimer > 15) { 
                         this.seedTimer = 0;
                         this.trySpawnSeed(scene, obstaclesList, allObjectsList);
                     }
                 }
 
-                // 3. Sistema de retoño del tocón (retoña en 30 segundos si no se extrae)
+                // 3. Sistema de retoño del tocón
                 if (this.state === 'stump') {
                     this.regrowthTimer += delta;
-                    if (this.regrowthTimer > 30) { 
+                    if (this.regrowthTimer > 10) { 
                         this.regrowthTimer = 0;
                         this.state = 'sapling';
-                        this.growthProgress = 0.15;
+                        this.growthProgress = 0.2;
                         this.health = 100;
-                        group.scale.setScalar(0.15);
+                        group.scale.setScalar(0.2);
                         
                         this.collider.radius = 0.18;
                         this.collider.height = 0.6;
@@ -102,16 +103,17 @@ const TreeObject = {
             trySpawnSeed(scene, obstaclesList, allObjectsList) {
                 let newPos = null;
                 let validPositionFound = false;
+                const planetRadius = 5;
 
                 for (let attempt = 0; attempt < 5; attempt++) {
-                    const offsetTheta = (Math.random() - 0.5) * 0.2;
-                    const offsetPhi = (Math.random() - 0.5) * 0.2;
+                    const offsetTheta = (Math.random() - 0.5) * 0.25;
+                    const offsetPhi = (Math.random() - 0.5) * 0.25;
                     
-                    const testPos = group.position.clone().add(new THREE.Vector3(offsetTheta, 0, offsetPhi)).normalize().multiplyScalar(5.0);
+                    const testPos = group.position.clone().add(new THREE.Vector3(offsetTheta, 0, offsetPhi)).normalize().multiplyScalar(planetRadius);
 
                     let tooClose = false;
                     for (let i = 0; i < allObjectsList.length; i++) {
-                        if (allObjectsList[i].mesh && allObjectsList[i].mesh.position.distanceTo(testPos) < 0.6) {
+                        if (allObjectsList[i].mesh && allObjectsList[i].mesh.position.distanceTo(testPos) < 0.5) {
                             tooClose = true;
                             break;
                         }
@@ -125,22 +127,25 @@ const TreeObject = {
                 }
 
                 if (validPositionFound && newPos) {
-                    const newTree = TreeObject.create(newPos, 'sapling', 0.1);
-                    newTree.mesh.scale.setScalar(0.1);
+                    const newTree = create(newPos, 'sapling', 0.2);
+                    newTree.mesh.scale.setScalar(0.2);
 
-                    scene.add(newTree.mesh);
+                    if (scene && typeof scene.add === 'function') {
+                        scene.add(newTree.mesh);
+                    }
                     obstaclesList.push(newTree.collider);
                     allObjectsList.push(newTree);
                 }
             }
         };
 
-        if (initialState === 'sapling') {
-            group.scale.setScalar(Math.max(0.15, initialProgress));
-        }
-
+        group.scale.setScalar(Math.max(0.2, initialProgress));
         return treeEntity;
     }
-};
+
+    return {
+        create
+    };
+})();
 
 window.TreeObject = TreeObject;
