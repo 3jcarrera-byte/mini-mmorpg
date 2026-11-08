@@ -21,7 +21,7 @@ const CameraModule = (() => {
             // 🌟 Cámara 2: Tercera persona estilo CODM (más pegada al hombro y cercana)
             const baseDistance = 1.2; 
             const baseHeight = 0.45;
-            const codmYawOffset = 0.12; // Desplazamiento lateral compacto tipo CODM
+            const codmYawOffset = 0.16; // Desplazamiento lateral compacto tipo CODM
             const pitchOffset = Math.sin(player.pitch) * 0.2;
 
             let camPos = player.position.clone()
