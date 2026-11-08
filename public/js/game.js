@@ -134,7 +134,10 @@ const Game = {
         const hudName = document.getElementById('hud-char-name');
         if (hudName) hudName.innerText = `${this.localPlayer.name} [${this.localPlayer.alienRace.toUpperCase()}] (Lv.${this.localPlayer.level})`;
 
-        this.createShooterCrosshair();
+        // Inicializar la mira a través del módulo externo modular
+        if (typeof CrosshairModule !== 'undefined') {
+            CrosshairModule.init();
+        }
 
         if (typeof InventoryModule !== 'undefined' && typeof InventoryModule.init === 'function') {
             InventoryModule.init();
@@ -158,53 +161,6 @@ const Game = {
         this.localPlayer.yawOffset -= e.movementX * sensitivity;
         this.localPlayer.pitch -= e.movementY * sensitivity;
         this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
-    },
-
-    createShooterCrosshair() {
-        const container = document.querySelector('.game-container');
-        if (container && !document.getElementById('game-crosshair')) {
-            const crosshair = document.createElement('div');
-            crosshair.id = 'game-crosshair';
-            crosshair.style.position = 'absolute';
-            crosshair.style.top = '50%';
-            crosshair.style.left = '50%';
-            crosshair.style.width = '24px';
-            crosshair.style.height = '24px';
-            crosshair.style.transform = 'translate(-50%, -50%)';
-            crosshair.style.pointerEvents = 'none';
-            crosshair.style.zIndex = '100';
-
-            const lines = [
-                { top: '10px', left: '0px', width: '8px', height: '2px' },  
-                { top: '10px', left: '16px', width: '8px', height: '2px' }, 
-                { top: '0px', left: '10px', width: '2px', height: '8px' },  
-                { top: '16px', left: '10px', width: '2px', height: '8px' }   
-            ];
-
-            lines.forEach(cfg => {
-                const line = document.createElement('div');
-                line.style.position = 'absolute';
-                line.style.top = cfg.top;
-                line.style.left = cfg.left;
-                line.style.width = cfg.width;
-                line.style.height = cfg.height;
-                line.style.backgroundColor = 'rgba(0, 255, 204, 0.9)';
-                line.style.boxShadow = '0 0 2px rgba(0,0,0,0.8)';
-                crosshair.appendChild(line);
-            });
-
-            const dot = document.createElement('div');
-            dot.style.position = 'absolute';
-            dot.style.top = '11px';
-            dot.style.left = '11px';
-            dot.style.width = '2px';
-            dot.style.height = '2px';
-            dot.style.backgroundColor = '#ffffff';
-            crosshair.appendChild(dot);
-
-            container.style.position = 'relative';
-            container.appendChild(crosshair);
-        }
     },
 
     createPlayerAvatar(alienRace, customColor) {
@@ -389,7 +345,6 @@ const Game = {
 
         if (this.localPlayer.mesh) {
             const p = this.localPlayer;
-            const crosshair = document.getElementById('game-crosshair');
             let isMoving = false;
 
             const R = this.planetRadius;
@@ -435,16 +390,14 @@ const Game = {
                 p.verticalVelocity = 0;
             }
 
-            if (crosshair) {
-                crosshair.style.display = 'block';
-                const scale = isMoving ? 'scale(1.2)' : 'scale(1)';
-                crosshair.style.transform = `translate(-50%, -50%) ${scale}`;
+            // Actualizar mira modularmente
+            if (typeof CrosshairModule !== 'undefined') {
+                CrosshairModule.update(isMoving);
             }
 
             const targetPos = p.position.clone();
 
             if (isMoving) {
-                // Dirección de movimiento calculada en base a la vista de la cámara
                 const moveDir = viewForward.clone().multiplyScalar(moveForward).add(viewRight.clone().multiplyScalar(moveSide)).normalize();
                 
                 const axis = new THREE.Vector3().crossVectors(normal, moveDir).normalize();
@@ -454,7 +407,6 @@ const Game = {
                 targetPos.applyAxisAngle(axis, angle);
                 targetPos.add(planetGlobalCenter);
 
-                // El personaje mira exactamente hacia donde camina
                 p.forward.copy(moveDir);
             }
 
@@ -467,7 +419,6 @@ const Game = {
             normal = p.position.clone().sub(planetGlobalCenter).normalize();
             p.mesh.position.copy(p.position);
 
-            // Orientación estable y limpia del avatar sin giros espurios en su propio eje
             const currentRight = new THREE.Vector3().crossVectors(p.forward, normal).normalize();
             const orthogonalForward = new THREE.Vector3().crossVectors(normal, currentRight).normalize();
             const rotMatrix = new THREE.Matrix4().makeBasis(currentRight, normal, orthogonalForward.clone().negate());
