@@ -122,23 +122,56 @@ const WorldModule = (() => {
     }
 
     function createAtmosphereLayer(config) {
-        // Fórmula de grosor dinámico optimizada para un halo atmosférico brillante y difuso tipo rim-lighting
-        const targetThickness = 4.0 * Math.sqrt(4.0 / currentRadius);
+        const targetThickness = 4.5 * Math.sqrt(4.0 / currentRadius);
         const atmosphereRadius = currentRadius + targetThickness;
 
         const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
-        const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.35;
+        const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.4;
 
-        const atmosphereMat = new THREE.MeshStandardMaterial({
-            color: config.atmosphereColor || 0x87ceeb,
-            emissive: config.atmosphereColor || 0x87ceeb,
-            emissiveIntensity: 0.35,
+        // Shader Material dinámico Día/Noche: opaco/luminoso del lado del sol, transparente del lado oscuro (espacio sideral visible)
+        const atmosphereMat = new THREE.ShaderMaterial({
+            uniforms: {
+                uSunPosition: { value: new THREE.Vector3(0, 0, 0) },
+                uAtmosphereColor: { value: new THREE.Color(config.atmosphereColor || 0x87ceeb) },
+                uDensity: { value: density }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vPositionWorld;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                    vPositionWorld = worldPosition.xyz;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vNormal;
+                varying vec3 vPositionWorld;
+                uniform vec3 uSunPosition;
+                uniform vec3 uAtmosphereColor;
+                uniform float uDensity;
+                void main() {
+                    // Fresnel para el borde del halo atmosférico
+                    float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+                    
+                    // Dirección de la luz solar desde el origen estelar (0,0,0)
+                    vec3 sunDir = normalize(uSunPosition - vPositionWorld);
+                    float sunLighting = dot(normalize(vNormal), sunDir);
+                    
+                    // Transición suave: lado iluminado sólido/brillante, lado nocturno totalmente transparente para ver el espacio
+                    float dayNightFactor = smoothstep(-0.25, 0.35, sunLighting);
+                    
+                    float alpha = intensity * uDensity * (0.05 + 0.95 * dayNightFactor);
+                    if (alpha < 0.01) discard;
+
+                    gl_FragColor = vec4(uAtmosphereColor, alpha);
+                }
+            `,
             transparent: true,
-            opacity: density * 0.75,
-            roughness: 1.0,
-            metalness: 0.0,
             side: THREE.BackSide, 
-            depthWrite: false     
+            depthWrite: false,
+            blending: THREE.AdditiveBlending     
         });
 
         atmosphereMesh = new THREE.Mesh(atmosphereGeo, atmosphereMat);
