@@ -3,13 +3,12 @@
 const WorldModule = (() => {
     let planetMesh;
     let oceanMesh;
-    let atmosphereMesh;
+    let atmosphereController = null;
     let currentRadius = 5;
     const obstacles = []; 
     const interactiveObjects = []; 
 
     function createPlanet(scene, planetTypeKey = "TEMPERATE_FOREST", orbitRadius = 0, customRadius = null) {
-        // Limpiar recursos previos antes de generar uno nuevo
         destroyWorld(scene);
 
         obstacles.length = 0;
@@ -17,12 +16,10 @@ const WorldModule = (() => {
 
         scene.background = new THREE.Color(0x020208);
 
-        // Cargar configuración unificada desde GalaxyModule.PLANET_ARCHETYPES con fallback robusto
         const config = (typeof GalaxyModule !== 'undefined' && GalaxyModule.PLANET_ARCHETYPES) 
             ? GalaxyModule.PLANET_ARCHETYPES[planetTypeKey] 
             : (window.PLANET_TYPES ? window.PLANET_TYPES[planetTypeKey] : null) || { radiusRange: [4, 5], colors: { low: 0x2e5a1e, mid: 0x4a7c36, high: 0x8a8a8a, peak: 0xffffff } };
         
-        // Sincronizar el radio exacto recibido del registro de la galaxia o calcularlo por defecto
         if (customRadius !== null && customRadius !== undefined) {
             currentRadius = customRadius;
         } else if (config && Array.isArray(config.radiusRange)) {
@@ -41,8 +38,6 @@ const WorldModule = (() => {
         });
 
         planetMesh = new THREE.Mesh(planetGeo, planetMat);
-        
-        // Posicionar el planeta en su órbita local respecto al centro estelar
         planetMesh.position.set(orbitRadius, 0, 0);
         scene.add(planetMesh);
 
@@ -50,11 +45,11 @@ const WorldModule = (() => {
             createOceanLayer(config);
         }
 
-        if (config) {
-            createAtmosphereLayer(config);
+        if (config && typeof AtmosphereObject !== 'undefined') {
+            atmosphereController = AtmosphereObject.create(currentRadius, config);
+            planetMesh.add(atmosphereController.mesh);
         }
 
-        // Solo generar vegetación y recursos si el planeta tiene recursos definidos y válidos
         if (config && config.resources && Array.isArray(config.resources) && config.resources.length > 0) {
             generateFeatures(planetMesh, config.resources);
         }
@@ -74,10 +69,9 @@ const WorldModule = (() => {
             oceanMesh.material.dispose();
             oceanMesh = null;
         }
-        if (atmosphereMesh) {
-            atmosphereMesh.geometry.dispose();
-            atmosphereMesh.material.dispose();
-            atmosphereMesh = null;
+        if (atmosphereController) {
+            atmosphereController.destroy();
+            atmosphereController = null;
         }
     }
 
@@ -121,63 +115,6 @@ const WorldModule = (() => {
         planetMesh.add(oceanMesh);
     }
 
-    function createAtmosphereLayer(config) {
-        const targetThickness = 4.5 * Math.sqrt(4.0 / currentRadius);
-        const atmosphereRadius = currentRadius + targetThickness;
-
-        const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
-        const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.4;
-
-        // Shader Material dinámico Día/Noche: opaco/luminoso del lado del sol, transparente del lado oscuro (espacio sideral visible)
-        const atmosphereMat = new THREE.ShaderMaterial({
-            uniforms: {
-                uSunPosition: { value: new THREE.Vector3(0, 0, 0) },
-                uAtmosphereColor: { value: new THREE.Color(config.atmosphereColor || 0x87ceeb) },
-                uDensity: { value: density }
-            },
-            vertexShader: `
-                varying vec3 vNormal;
-                varying vec3 vPositionWorld;
-                void main() {
-                    vNormal = normalize(normalMatrix * normal);
-                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-                    vPositionWorld = worldPosition.xyz;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                varying vec3 vNormal;
-                varying vec3 vPositionWorld;
-                uniform vec3 uSunPosition;
-                uniform vec3 uAtmosphereColor;
-                uniform float uDensity;
-                void main() {
-                    // Fresnel para el borde del halo atmosférico
-                    float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
-                    
-                    // Dirección de la luz solar desde el origen estelar (0,0,0)
-                    vec3 sunDir = normalize(uSunPosition - vPositionWorld);
-                    float sunLighting = dot(normalize(vNormal), sunDir);
-                    
-                    // Transición suave: lado iluminado sólido/brillante, lado nocturno totalmente transparente para ver el espacio
-                    float dayNightFactor = smoothstep(-0.25, 0.35, sunLighting);
-                    
-                    float alpha = intensity * uDensity * (0.05 + 0.95 * dayNightFactor);
-                    if (alpha < 0.01) discard;
-
-                    gl_FragColor = vec4(uAtmosphereColor, alpha);
-                }
-            `,
-            transparent: true,
-            side: THREE.BackSide, 
-            depthWrite: false,
-            blending: THREE.AdditiveBlending     
-        });
-
-        atmosphereMesh = new THREE.Mesh(atmosphereGeo, atmosphereMat);
-        planetMesh.add(atmosphereMesh);
-    }
-
     function generateFeatures(containerMesh, resourcesArray) {
         const generatedPositions = [];
         let trees = 0;
@@ -191,7 +128,6 @@ const WorldModule = (() => {
             }
         });
 
-        // Si el planeta no tiene árboles ni rocas declarados, salir sin generar vegetación fantasma
         if (trees === 0 && rocks === 0) return;
 
         const totalItems = trees + rocks;
@@ -242,7 +178,9 @@ const WorldModule = (() => {
             oceanMesh.rotation.y -= 0.0006;
             oceanMesh.rotation.x += 0.0002;
         }
-        if (atmosphereMesh) atmosphereMesh.rotation.y += 0.0004;
+        if (atmosphereController) {
+            atmosphereController.update(delta);
+        }
     }
 
     function updateEcosystem(delta, scene) {
