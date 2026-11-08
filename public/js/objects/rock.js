@@ -25,17 +25,18 @@ const RockObject = (() => {
         // Posicionar en la superficie
         group.position.copy(position);
 
-        // 🌟 CORRECCIÓN DE ORIENTACIÓN: Alinear hacia afuera usando la normal de la esfera
+        // Orientación correcta hacia afuera usando la normal de la esfera
         const normal = position.clone().normalize();
         group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
 
-        // Desplazamiento leve opcional para asegurar que no se hundan
+        // Desplazamiento leve para asegurar que no se hundan
         group.position.addScaledVector(normal, 0.02);
 
+        // 🌟 Colisión reducida y ajustada al mínimo preciso
         const colliderRef = {
             position: group.position.clone(),
-            radius: 0.22,
-            height: 0.35
+            radius: 0.12,
+            height: 0.25
         };
 
         const rockEntity = {
@@ -57,7 +58,7 @@ const RockObject = (() => {
                 
                 // Ocultar o reducir malla al ser minada por completo
                 group.scale.set(0.1, 0.1, 0.1);
-                this.collider.radius = 0.05;
+                this.collider.radius = 0.04;
                 
                 return this.resourceAmount;
             }
