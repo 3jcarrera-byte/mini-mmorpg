@@ -3,46 +3,55 @@
 const SunModule = (() => {
     let sunMesh = null;
     let sunLight = null;
+    let ambientLight = null;
 
     function create(scene, options = {}) {
-        const radius = options.radius || 4.0;
+        // Limpiar cualquier sol previo para evitar duplicados en la escena
+        destroy(scene);
 
-        // El Sol se ubica estrictamente en el centro (0,0,0) como el origen del sistema
+        const radius = options.radius || 4.0;
+        const position = options.position || { x: 0, y: 0, z: 0 };
+
+        // El Sol se ubica en el centro del sistema estelar
         const sunGeo = new THREE.SphereGeometry(radius, 32, 32);
         
-        // Usar MeshStandardMaterial con emisión alta para que actúe como una estrella brillante real
-        const sunMat = new THREE.MeshStandardMaterial({ 
-            color: 0xffaa00,
-            emissive: 0xffea00,
-            emissiveIntensity: 2.0,
-            roughness: 0.2
+        // Material con emisión alta para que actúe como una estrella brillante real
+        const sunMat = new THREE.MeshBasicMaterial({ 
+            color: options.color || 0xffea00
         });
         
         sunMesh = new THREE.Mesh(sunGeo, sunMat);
-        sunMesh.position.set(0, 0, 0);
+        sunMesh.position.set(position.x, position.y, position.z);
         scene.add(sunMesh);
 
-        // Luz direccional o puntual masiva que irradia desde el sol hacia afuera
-        sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        // Luz puntual o direccional masiva que irradia luz y calor hacia todo el sistema
+        sunLight = new THREE.PointLight(0xffffff, 2.5, 1500, 0.5);
         sunLight.position.set(0, 0, 0);
         sunMesh.add(sunLight);
 
-        // Luz ambiental para asegurar visibilidad base en el espacio y en las noches
-        const ambientLight = new THREE.AmbientLight(0x333355, 0.4);
+        // Luz ambiental base para el espacio profundo y las zonas oscuras de los planetas
+        ambientLight = new THREE.AmbientLight(0x222244, 0.3);
         scene.add(ambientLight);
 
         return sunMesh;
     }
 
-    function rotateSun(delta = 0.016) {
+    function destroy(scene) {
         if (sunMesh) {
-            sunMesh.rotation.y += 0.002; // Rotación propia del sol
+            scene.remove(sunMesh);
+            sunMesh.geometry.dispose();
+            sunMesh.material.dispose();
+            sunMesh = null;
+        }
+        if (ambientLight) {
+            scene.remove(ambientLight);
+            ambientLight = null;
         }
     }
 
     return {
         create,
-        rotateSun
+        destroy
     };
 })();
 
