@@ -16,7 +16,7 @@ const Game = {
         pitch: 0,
         yawOffset: 0.35, 
         weaponRange: 15.0,
-        radius: 0.08 // 🌟 Radio físico ultra compacto para evitar atascos en el terreno
+        radius: 0.08 // Radio físico ultra compacto para evitar atascos en el terreno
     },
     remotePlayers: {},
     keys: {},
@@ -244,7 +244,7 @@ const Game = {
         });
     },
 
-    // --- INTERACCIÓN DE TALA Y MINADO CON REGLA ESTRICTA Y CERCANA DE DISTANCIA ---
+    // --- INTERACCIÓN DE TALA Y MINADO CON FILTRADO DE OBJETOS ACTIVOS Y REGLA DE DISTANCIA ---
     handleBuildClick(e) {
         if (e.button !== 0) return; 
 
@@ -253,9 +253,15 @@ const Game = {
 
         raycaster.setFromCamera(mouse, this.camera);
         
-        const interactiveObjects = WorldModule.getInteractiveObjects();
-        const meshes = interactiveObjects.map(obj => obj.mesh).filter(Boolean);
+        // 🌟 Filtrar únicamente objetos interactivos que estén activos y visibles (ignora tocones y piedras recogidas)
+        const interactiveObjects = WorldModule.getInteractiveObjects().filter(obj => {
+            if (!obj.mesh || !obj.mesh.visible) return false;
+            if (obj.type === 'tree' && obj.state !== 'adult') return false;
+            if (obj.type === 'stone' && !obj.isReady) return false;
+            return true;
+        });
 
+        const meshes = interactiveObjects.map(obj => obj.mesh);
         const intersects = raycaster.intersectObjects(meshes, true);
 
         if (intersects.length > 0) {
@@ -270,9 +276,9 @@ const Game = {
             }
 
             if (targetEntity) {
-                // 🌟 Regla estricta de cercanía máxima (1.2 unidades para impedir recolección lejana)
+                // 🌟 Validación de cercanía equilibrada (2.0 unidades)
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
-                if (distanceToTarget > 1.2) {
+                if (distanceToTarget > 2.0) {
                     console.log("Estás demasiado lejos del objeto.");
                     return;
                 }
@@ -296,7 +302,7 @@ const Game = {
         }
     },
 
-    // 🌟 Colisiones optimizadas sin márgenes exagerados para evitar bloqueos en el terreno
+    // 🌟 Colisiones optimizadas sin atascos en desniveles
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -317,7 +323,7 @@ const Game = {
             if (!obsPos) continue;
 
             const nextDist = nextPos.distanceTo(obsPos);
-            const obstacleRadius = (obs.radius || 0.15) + 0.02; // Margen mínimo para fluidez total
+            const obstacleRadius = obs.radius || 0.15;
 
             if (nextDist < (playerRadius + obstacleRadius)) {
                 return true; 
@@ -446,40 +452,3 @@ const Game = {
 
                 const camNormal = camPos.clone().normalize();
                 if (camPos.length() < R + 0.3) {
-                    camPos.copy(camNormal.multiplyScalar(R + 0.3));
-                }
-
-                this.camera.position.copy(camPos);
-                const lookTarget = p.position.clone().add(normal.clone().multiplyScalar(0.3)).add(p.forward.clone().multiplyScalar(2.0));
-                this.camera.lookAt(lookTarget);
-
-            } else if (this.cameraMode === 'rts') {
-                // 🌟 Modo Warcraft / RTS: Altura y distancia reducidas a la mitad exactas para estar cerca del personaje
-                const rtsHeight = 1.2; 
-                const rtsBack = 0.6;   
-                
-                const rtsPitch = Math.max(-0.8, Math.min(0.35, p.pitch));
-
-                let camPos = p.position.clone()
-                    .add(normal.clone().multiplyScalar(rtsHeight))
-                    .sub(p.forward.clone().multiplyScalar(rtsBack));
-
-                const camNormal = camPos.clone().normalize();
-                if (camPos.length() < R + 0.3) {
-                    camPos.copy(camNormal.multiplyScalar(R + 0.3));
-                }
-
-                this.camera.position.copy(camPos);
-                
-                const lookDir = p.forward.clone();
-                lookDir.applyAxisAngle(right, rtsPitch);
-                const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.2)).add(lookDir.multiplyScalar(p.weaponRange));
-                this.camera.lookAt(targetLookAt);
-            }
-        }
-
-        this.renderer.render(this.scene, this.camera);
-    }
-};
-
-window.GameModule = Game;
