@@ -49,7 +49,7 @@ const TreeObject = {
             seedTimer: 0,
 
             update(delta, scene, obstaclesList, allObjectsList) {
-                // 1. Crecimiento rápido de brote a adulto en exactamente 60 segundos (1 min)
+                // 1. Crecimiento activo de brote a adulto en 60 segundos (1 min)
                 if (this.state === 'sapling') {
                     this.growthProgress += delta / 60.0; 
                     if (this.growthProgress >= 1.0) {
@@ -109,7 +109,6 @@ const TreeObject = {
                     
                     const testPos = group.position.clone().add(new THREE.Vector3(offsetTheta, 0, offsetPhi)).normalize().multiplyScalar(5.0);
 
-                    // Evitar que se monten unos sobre otros comprobando la distancia mínima
                     let tooClose = false;
                     for (let i = 0; i < allObjectsList.length; i++) {
                         if (allObjectsList[i].mesh && allObjectsList[i].mesh.position.distanceTo(testPos) < 0.6) {
@@ -126,7 +125,6 @@ const TreeObject = {
                 }
 
                 if (validPositionFound && newPos) {
-                    const planetRadius = 5.0;
                     const newTree = TreeObject.create(newPos, 'sapling', 0.1);
                     newTree.mesh.scale.setScalar(0.1);
 
