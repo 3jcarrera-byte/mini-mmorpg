@@ -9,14 +9,14 @@ const Game = {
         altitude: 0,         
         wood: 100, 
         name: 'Héroe', 
-        level: 0, 
+        level: 1, 
         classType: 'guerrero', 
         color: 0xff0033,
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
         weaponRange: 15.0,
-        radius: 0.15 // Radio físico compacto para evitar espacios visuales vacíos
+        radius: 0.08 // Radio físico compacto ajustado al mínimo
     },
     remotePlayers: {},
     keys: {},
@@ -28,7 +28,7 @@ const Game = {
     
     crosshairOffset: { x: 0, y: 0 },
     maxCrosshairRadius: 40,
-    lastFrameTime: 0, // Para el cálculo preciso de delta en el ecosistema
+    lastFrameTime: 0,
 
     start(characterData) {
         if (characterData) {
@@ -72,10 +72,10 @@ const Game = {
         this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
         this.renderer.setSize(800, 600);
 
-        // Iluminación
-        this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-        const sun = new THREE.DirectionalLight(0xffd700, 1.2);
-        sun.position.set(10, 20, 10);
+        // Iluminación (Sol lateral fijo para que alumbre de un solo lado mientras el planeta gira)
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+        const sun = new THREE.DirectionalLight(0xffd700, 1.4);
+        sun.position.set(15, 20, 15);
         this.scene.add(sun);
 
         // --- CREAR EL PLANETA ESFÉRICO ---
@@ -91,7 +91,7 @@ const Game = {
         this.localPlayer.altitude = 0;
         this.localPlayer.verticalVelocity = 0;
 
-        // Crear malla del jugador local
+        // Crear malla del jugador local (versión compacta y pequeña)
         this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
         this.scene.add(this.localPlayer.mesh);
 
@@ -104,7 +104,6 @@ const Game = {
         window.addEventListener('keydown', e => {
             this.keys[e.code] = true;
 
-            // Cambiar modo de cámara con la tecla V
             if (e.code === 'KeyV') {
                 if (this.cameraMode === 'first') {
                     this.cameraMode = 'third';
@@ -140,7 +139,6 @@ const Game = {
             }
         });
 
-        // --- MOVIMIENTO DEL MOUSE PARA GIRO FLUIDO ---
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.003;
@@ -209,18 +207,19 @@ const Game = {
     createPlayerAvatar(classType, customColor) {
         const group = new THREE.Group();
         
+        // 🌟 Avatar escalado a un tamaño compacto y estético
         const body = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8), 
+            new THREE.CylinderGeometry(0.08, 0.08, 0.35, 8), 
             new THREE.MeshStandardMaterial({ color: customColor })
         );
-        body.position.y = 0.3;
+        body.position.y = 0.175;
         group.add(body);
 
         const head = new THREE.Mesh(
-            new THREE.SphereGeometry(0.12, 8, 8), 
+            new THREE.SphereGeometry(0.07, 8, 8), 
             new THREE.MeshStandardMaterial({ color: 0xffd700 })
         );
-        head.position.y = 0.7;
+        head.position.y = 0.38;
         group.add(head);
 
         return group;
@@ -251,7 +250,6 @@ const Game = {
         if (intersects.length > 0) {
             let hitMesh = intersects[0].object;
             
-            // Subir al objeto raíz del grupo si golpeamos una malla hija
             while (hitMesh.parent && !interactiveObjects.some(obj => obj.mesh === hitMesh)) {
                 hitMesh = hitMesh.parent;
             }
@@ -259,7 +257,6 @@ const Game = {
             const targetEntity = interactiveObjects.find(obj => obj.mesh === hitMesh);
 
             if (targetEntity) {
-                // Verificar si es un árbol y se puede talar
                 if (typeof targetEntity.chopDown === 'function' && targetEntity.state === 'adult') {
                     targetEntity.chopDown();
                     this.localPlayer.wood += targetEntity.resourceAmount;
@@ -267,7 +264,6 @@ const Game = {
                     const woodEl = document.getElementById('ui-wood');
                     if (woodEl) woodEl.innerText = this.localPlayer.wood;
                 } 
-                // Verificar si es una roca y se puede minar
                 else if (typeof targetEntity.mine === 'function' && targetEntity.health > 0) {
                     targetEntity.mine();
                 }
@@ -275,7 +271,7 @@ const Game = {
         }
     },
 
-    // --- DETECTOR DE COLISIONES FLUIDO SIN ATASCOS ---
+    // --- DETECTOR DE COLISIONES MÍNIMO Y PRECISO ---
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -288,7 +284,7 @@ const Game = {
 
         if (!obstacles || obstacles.length === 0) return false;
 
-        const playerRadius = this.localPlayer.radius; // 0.15
+        const playerRadius = this.localPlayer.radius; // 0.08
 
         for (let i = 0; i < obstacles.length; i++) {
             const obs = obstacles[i];
@@ -298,19 +294,16 @@ const Game = {
             const nextDist = nextPos.distanceTo(obsPos);
             const currentDist = this.localPlayer.position.distanceTo(obsPos);
             
-            const obstacleRadius = obs.radius || 0.18; 
-            const obstacleHeight = obs.height || 0.35;
+            const obstacleRadius = obs.radius || 0.12; 
+            const obstacleHeight = obs.height || 0.25;
 
-            // Si estamos invadiendo el radio de colisión horizontal del objeto
             if (nextDist < (playerRadius + obstacleRadius)) {
-                // Si el jugador está sobre el objeto o intentando salir de él, permitimos el movimiento libre
                 if (currentDist < (playerRadius + obstacleRadius)) {
                     if (nextDist >= currentDist) {
-                        return false; // Permite salir o moverse sin trabarse ni requerir salto obligatorio
+                        return false; 
                     }
                 }
 
-                // Bloquea únicamente si se choca frontalmente contra un objeto cuya altura supera la del jugador
                 if (currentAltitude < obstacleHeight) {
                     return true; 
                 }
@@ -323,9 +316,8 @@ const Game = {
         if (!this.isGameRunning) return;
         requestAnimationFrame(() => this.loop());
 
-        // Calcular el delta de tiempo transcurrido en segundos de forma limpia
         const now = performance.now();
-        const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1); // Limitar delta para evitar saltos bruscos si la pestaña pierde foco
+        const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1);
         this.lastFrameTime = now;
 
         // 1. Rotar levemente el planeta
@@ -333,7 +325,7 @@ const Game = {
             WorldModule.rotatePlanet();
         }
 
-        // 2. Actualizar el ecosistema del mundo (crecimiento de árboles, semillas, retoños)
+        // 2. Actualizar el ecosistema del mundo
         if (typeof WorldModule.updateEcosystem === 'function') {
             WorldModule.updateEcosystem(delta, this.scene, WorldModule.getObstacles());
         }
@@ -345,7 +337,7 @@ const Game = {
 
             const R = this.planetRadius;
             
-            // 🌟 ANCLAR Y ROTAR AL JUGADOR SOLIDARIAMENTE CON EL PLANETA (0.001 rad por frame en eje Y)
+            // Anclar y rotar al jugador solidariamente con el planeta
             const planetRotationStep = 0.001;
             p.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
             p.forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
@@ -381,7 +373,6 @@ const Game = {
                 crosshair.style.transform = `translate(-50%, -50%) ${scale}`;
             }
 
-            // Calcular siguiente posición prevista
             const targetPos = p.position.clone();
             const tempForward = p.forward.clone();
 
@@ -401,7 +392,6 @@ const Game = {
 
             targetPos.normalize().multiplyScalar(R + p.altitude);
 
-            // Validar si el movimiento choca con el sistema optimizado
             if (!this.checkCollision(targetPos, p.altitude)) {
                 p.position.copy(targetPos);
                 p.forward.copy(tempForward);
@@ -420,11 +410,11 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS ---
+            // --- GESTIÓN DE CÁMARAS PARA AVATAR COMPACTO ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
-                const eyeHeight = 0.75;
+                const eyeHeight = 0.35;
                 const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
                 this.camera.position.copy(eyePosition);
 
@@ -434,12 +424,12 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'third') {
-                let distanceBack = 3.5;
-                let heightUp = 1.6;
+                let distanceBack = 2.5;
+                let heightUp = 1.0;
 
                 if (this.isAiming) {
-                    distanceBack = 2.0;
-                    heightUp = 1.4;
+                    distanceBack = 1.5;
+                    heightUp = 0.8;
                 }
 
                 const camPos = p.position.clone()
@@ -447,8 +437,8 @@ const Game = {
                     .sub(p.forward.clone().multiplyScalar(distanceBack));
                 
                 const camNormal = camPos.clone().normalize();
-                if (camPos.length() < R + 0.5) {
-                    camPos.copy(camNormal.multiplyScalar(R + 0.5));
+                if (camPos.length() < R + 0.3) {
+                    camPos.copy(camNormal.multiplyScalar(R + 0.3));
                 }
 
                 this.camera.position.copy(camPos);
@@ -459,8 +449,8 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'rts') {
-                const rtsHeight = 4.0;
-                const rtsBack = 2.5;
+                const rtsHeight = 3.0;
+                const rtsBack = 1.8;
                 const camPos = p.position.clone()
                     .add(normal.clone().multiplyScalar(rtsHeight))
                     .sub(p.forward.clone().multiplyScalar(rtsBack));
