@@ -1,4 +1,4 @@
-// public/js/game.js
+// Bucle principal del juego y control del cliente (game.js)
 const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
@@ -234,9 +234,45 @@ const Game = {
         });
     },
 
+    // --- INTERACCIÓN DE TALA Y MINADO MEDIANTE RAYCASTING ---
     handleBuildClick(e) {
-        if (e.button === 0) {
-            const depth = e.shiftKey ? -1 : 0;
+        if (e.button !== 0) return; // Solo clic izquierdo
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2(0, 0); // Centro de la pantalla (mira)
+
+        raycaster.setFromCamera(mouse, this.camera);
+        
+        const interactiveObjects = WorldModule.getInteractiveObjects();
+        const meshes = interactiveObjects.map(obj => obj.mesh).filter(Boolean);
+
+        const intersects = raycaster.intersectObjects(meshes, true);
+
+        if (intersects.length > 0) {
+            let hitMesh = intersects[0].object;
+            
+            // Subir al objeto raíz del grupo si golpeamos una malla hija
+            while (hitMesh.parent && !interactiveObjects.some(obj => obj.mesh === hitMesh)) {
+                hitMesh = hitMesh.parent;
+            }
+
+            const targetEntity = interactiveObjects.find(obj => obj.mesh === hitMesh);
+
+            if (targetEntity) {
+                // Verificar si es un árbol y se puede talar
+                if (typeof targetEntity.chopDown === 'function' && targetEntity.state === 'adult') {
+                    targetEntity.chopDown();
+                    this.localPlayer.wood += targetEntity.resourceAmount;
+                    
+                    const woodEl = document.getElementById('ui-wood');
+                    if (woodEl) woodEl.innerText = this.localPlayer.wood;
+                } 
+                // Verificar si es una roca y se puede minar
+                else if (typeof targetEntity.mine === 'function' && targetEntity.health > 0) {
+                    const gainedStone = targetEntity.mine();
+                    // Puedes manejar el recurso de piedra aquí si tienes un elemento UI para ello
+                }
+            }
         }
     },
 
@@ -292,6 +328,11 @@ const Game = {
         const now = performance.now();
         const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1); // Limitar delta para evitar saltos bruscos si la pestaña pierde foco
         this.lastFrameTime = now;
+
+        // Rotar levemente el planeta para dar dinamismo visual
+        if (typeof WorldModule.rotatePlanet === 'function') {
+            WorldModule.rotatePlanet();
+        }
 
         // Actualizar el ecosistema del mundo (crecimiento de árboles, semillas, retoños)
         if (typeof WorldModule.updateEcosystem === 'function') {
