@@ -14,9 +14,9 @@ const Game = {
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
-        yawOffset: 0.35, // Desplazamiento lateral fijo en tercera persona
+        yawOffset: 0.35, 
         weaponRange: 15.0,
-        radius: 0.22 // Radio físico sólido para colisiones
+        radius: 0.12 // 🌟 Reducido para evitar que el jugador se quede atascado en el terreno o bordes de objetos
     },
     remotePlayers: {},
     keys: {},
@@ -244,6 +244,7 @@ const Game = {
         });
     },
 
+    // --- INTERACCIÓN DE TALA Y MINADO CON REGLA ESTRICTA DE DISTANCIA ---
     handleBuildClick(e) {
         if (e.button !== 0) return; 
 
@@ -269,8 +270,9 @@ const Game = {
             }
 
             if (targetEntity) {
+                // 🌟 Validación estricta de cercanía (máximo 1.8 unidades para evitar recolectar a lo lejos)
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
-                if (distanceToTarget > this.localPlayer.weaponRange) {
+                if (distanceToTarget > 1.8) {
                     console.log("Estás demasiado lejos del objeto.");
                     return;
                 }
@@ -294,6 +296,7 @@ const Game = {
         }
     },
 
+    // 🌟 Colisiones fluidas y limpias que evitan que el jugador se quede atascado en el terreno
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -314,7 +317,7 @@ const Game = {
             if (!obsPos) continue;
 
             const nextDist = nextPos.distanceTo(obsPos);
-            const obstacleRadius = (obs.radius || 0.15) + 0.12;
+            const obstacleRadius = (obs.radius || 0.15) + 0.05; // Margen optimizado para no atascarse
 
             if (nextDist < (playerRadius + obstacleRadius)) {
                 return true; 
@@ -413,18 +416,16 @@ const Game = {
             const rotMatrix = new THREE.Matrix4().makeBasis(right, normal, p.forward.clone().negate());
             p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
             
-            // Avatar visible en tercera y RTS, oculto en primera persona
             p.mesh.visible = (this.cameraMode !== 'first');
 
             if ((moveForward !== 0 || moveSide !== 0 || p.altitude > 0) && this.socket) {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS SEPARADAS Y OPTIMIZADAS ---
+            // --- GESTIÓN DE CÁMARAS OPTIMIZADAS ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
-                // 🌟 Primera persona real tipo Shooter limpia en los ojos
                 const eyeHeight = 0.38;
                 const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
                 this.camera.position.copy(eyePosition);
@@ -435,7 +436,6 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'third') {
-                // 🌟 Tercera persona: Vista Over-the-shoulder lateral y compacta
                 const baseDistance = 1.6;
                 const baseHeight = 0.6;
                 const pitchOffset = Math.sin(p.pitch) * 0.25;
@@ -454,11 +454,10 @@ const Game = {
                 this.camera.lookAt(lookTarget);
 
             } else if (this.cameraMode === 'rts') {
-                // 🌟 Modo Warcraft / RTS: Vista cenital elevada despejada, con abanico de pitch acotado (desde los pies hasta el rango frontal de apuntado)
-                const rtsHeight = 4.2;
-                const rtsBack = 2.5;
+                // 🌟 Modo Warcraft / RTS: Distancia reducida a la mitad (altura y distancia hacia atrás disminuidas)
+                const rtsHeight = 2.4; 
+                const rtsBack = 1.2;   
                 
-                // Abanico de grados equivalente (desde mirar abajo hacia los pies hasta un ángulo frontal/superior de 320° a 40°)
                 const rtsPitch = Math.max(-0.8, Math.min(0.35, p.pitch));
 
                 let camPos = p.position.clone()
@@ -472,7 +471,6 @@ const Game = {
 
                 this.camera.position.copy(camPos);
                 
-                // Apuntado dentro del abanico del personaje hasta el alcance del arma
                 const lookDir = p.forward.clone();
                 lookDir.applyAxisAngle(right, rtsPitch);
                 const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.2)).add(lookDir.multiplyScalar(p.weaponRange));
