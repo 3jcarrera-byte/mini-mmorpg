@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini MMORPG</title>
+    <title>Mini MMORPG Galáctico</title>
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
@@ -115,12 +115,15 @@
         </div>
     </div>
 
-    <!-- Orden estricto y limpio de scripts del ecosistema, inventario, módulos de control/cámaras y app -->
+    <!-- Orden estricto y limpio de scripts: Objetos, Configuraciones, Módulos de Entorno, Lógica y Aplicación -->
     <script src="js/objects/tree.js"></script>
     <script src="js/objects/rock.js"></script>
-    <script src="js/character.js"></script>
+    <script src="js/objects/weatherParticles.js"></script>
+    
     <script src="js/worldsConfig.js"></script>
     <script src="js/world.js"></script>
+    
+    <script src="js/character.js"></script>
     <script src="js/inventory.js"></script>
     <script src="js/input.js"></script>
     <script src="js/camera.js"></script>
