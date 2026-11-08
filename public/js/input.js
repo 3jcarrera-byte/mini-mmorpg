@@ -16,7 +16,7 @@ const InputModule = (() => {
                 }
             }
 
-            // 🌟 Selector de cámaras individual por botones 1, 2 y 3
+            // Teclas 1, 2 y 3 para alternar cámaras de forma instantánea
             if (e.code === 'Digit1' || e.code === 'Numpad1') {
                 Game.setCameraMode('first');
             } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
