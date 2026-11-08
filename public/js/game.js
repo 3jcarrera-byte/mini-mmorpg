@@ -22,7 +22,7 @@ const Game = {
     isGameRunning: false,
     planetRadius: 5.0,
     gravity: 0.004,
-    cameraMode: 'third', // 'first' (1), 'third' (2 - CODM), 'rts' (3 - Warcraft)
+    cameraMode: 'third',
     isAiming: false,
     lastFrameTime: 0,
 
@@ -187,7 +187,7 @@ const Game = {
         this.socket.on('initWorld', (data) => {
             const woodEl = document.getElementById('ui-wood');
             if (woodEl && typeof InventoryModule !== 'undefined') {
-                woodEl.innerText = InventoryModule.getData().wood;
+                woodEl.innerText = InventoryModule.getTotalItemCount('wood');
             }
         });
     },
@@ -200,14 +200,14 @@ const Game = {
 
         raycaster.setFromCamera(mouse, this.camera);
         
+        // Filtramos objetos interactivos válidos (árboles vivos/creciendo o rocas listas)
         const interactiveObjects = WorldModule.getInteractiveObjects().filter(obj => {
             if (!obj.mesh || !obj.mesh.visible) return false;
-            if (obj.type === 'tree' && obj.state !== 'adult') return false;
+            if (obj.type === 'tree' && obj.state === 'stump') return false;
             if (obj.type === 'stone' && !obj.isReady) return false;
             return true;
         });
 
-        // 🌟 Forzamos la actualización de matrices mundiales para que Three.js refleje la rotación del planeta
         interactiveObjects.forEach(obj => {
             if (obj.mesh) {
                 obj.mesh.updateMatrixWorld(true);
@@ -229,10 +229,10 @@ const Game = {
             }
         }
 
-        // 🌟 Respaldo por proximidad usando getWorldPosition para sincronizarse exactamente con el planeta en rotación
+        // Respaldo por proximidad con distancia estricta de 1.3
         if (!targetEntity) {
             let closestObj = null;
-            let minDist = 1.3; // Rango exacto de interacción
+            let minDist = 1.3; 
 
             interactiveObjects.forEach(obj => {
                 const worldPos = new THREE.Vector3();
@@ -252,13 +252,15 @@ const Game = {
             targetEntity.mesh.getWorldPosition(worldPos);
             const distanceToTarget = this.localPlayer.position.distanceTo(worldPos);
             
+            // Distancia de recolección estricta máxima de 1.3
             if (distanceToTarget > 1.3) {
                 console.log("Estás demasiado lejos del objeto.");
                 return;
             }
 
-            if (typeof targetEntity.chopDown === 'function' && targetEntity.state === 'adult') {
-                const amount = targetEntity.resourceAmount || 15;
+            // 🌟 Permitir talar árboles tanto en estado adult como sapling (creciendo)
+            if (typeof targetEntity.chopDown === 'function' && targetEntity.state !== 'stump') {
+                const amount = targetEntity.resourceAmount || 1;
                 targetEntity.chopDown();
                 
                 if (typeof InventoryModule !== 'undefined') {
@@ -292,6 +294,9 @@ const Game = {
 
         for (let i = 0; i < obstacles.length; i++) {
             const obs = obstacles[i];
+            // 🌟 Omitir colisionadores inactivos (cuando el árbol/roca está cortado, invisible o reponiéndose)
+            if (obs.active === false) continue;
+
             const basePos = obs.position || obs; 
             if (!basePos) continue;
 
