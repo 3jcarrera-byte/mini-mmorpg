@@ -9,7 +9,7 @@ const Game = {
         altitude: 0,         
         wood: 100, 
         name: 'Héroe', 
-        level: 1, 
+        level: 0, 
         classType: 'guerrero', 
         color: 0xff0033,
         position: new THREE.Vector3(0, 5.0, 0),
@@ -328,12 +328,12 @@ const Game = {
         const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1); // Limitar delta para evitar saltos bruscos si la pestaña pierde foco
         this.lastFrameTime = now;
 
-        // Rotar levemente el planeta para dar dinamismo visual
+        // 1. Rotar levemente el planeta
         if (typeof WorldModule.rotatePlanet === 'function') {
             WorldModule.rotatePlanet();
         }
 
-        // Actualizar el ecosistema del mundo (crecimiento de árboles, semillas, retoños)
+        // 2. Actualizar el ecosistema del mundo (crecimiento de árboles, semillas, retoños)
         if (typeof WorldModule.updateEcosystem === 'function') {
             WorldModule.updateEcosystem(delta, this.scene, WorldModule.getObstacles());
         }
@@ -344,6 +344,12 @@ const Game = {
             let isMoving = false;
 
             const R = this.planetRadius;
+            
+            // 🌟 ANCLAR Y ROTAR AL JUGADOR SOLIDARIAMENTE CON EL PLANETA (0.001 rad por frame en eje Y)
+            const planetRotationStep = 0.001;
+            p.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
+            p.forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
+
             let normal = p.position.clone().normalize();
 
             p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
