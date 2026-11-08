@@ -1,4 +1,4 @@
-// Módulo de Mundo Esférico 
+// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK)
 const WorldModule = (() => {
     let planetMesh;
     let playerPos = { theta: 0, phi: Math.PI / 4 };
@@ -22,11 +22,12 @@ const WorldModule = (() => {
         planetMesh = new THREE.Mesh(planetGeo, planetMat);
         scene.add(planetMesh);
 
-        generateFeatures(scene, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
+        // Pasamos planetMesh como contenedor para que los árboles/rocas sean hijos del planeta
+        generateFeatures(planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
         return planetMesh;
     }
 
-    function generateFeatures(scene, trees, rocks) {
+    function generateFeatures(containerMesh, trees, rocks) {
         const generatedPositions = [];
 
         for (let i = 0; i < (trees + rocks); i++) {
@@ -80,7 +81,10 @@ const WorldModule = (() => {
             }
 
             if (featureData) {
-                if (featureData.mesh) scene.add(featureData.mesh);
+                if (featureData.mesh) {
+                    // Añadir como hijo del planeta para que rote orgánicamente con él
+                    containerMesh.add(featureData.mesh);
+                }
                 if (featureData.collider) obstacles.push(featureData.collider);
                 interactiveObjects.push(featureData);
             }
@@ -104,7 +108,11 @@ const WorldModule = (() => {
         structureMesh.lookAt(0, 0, 0);
         structureMesh.rotateX(Math.PI / 2);
 
-        scene.add(structureMesh);
+        if (planetMesh) {
+            planetMesh.add(structureMesh);
+        } else {
+            scene.add(structureMesh);
+        }
         structures.push(structureMesh);
 
         obstacles.push({
