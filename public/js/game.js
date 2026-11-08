@@ -3,8 +3,8 @@ const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
         mesh: null, 
-        speed: 0.05, 
-        jumpSpeed: 0.08,    
+        speed: 0.03, 
+        jumpSpeed: 0.04,    
         verticalVelocity: 0, 
         altitude: 0,         
         name: 'Héroe', 
