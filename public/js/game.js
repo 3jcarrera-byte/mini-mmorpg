@@ -13,7 +13,7 @@ const Game = {
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
-        yawOffset: 0.35, 
+        yawOffset: 0.22, 
         weaponRange: 15.0,
         radius: 0.08 
     },
@@ -21,7 +21,7 @@ const Game = {
     isGameRunning: false,
     planetRadius: 5.0,
     gravity: 0.004,
-    cameraMode: 'third', // 'first' (1), 'third' (2), 'rts' (3)
+    cameraMode: 'third', // 'first' (1), 'third' (2 - CODM), 'rts' (3 - Warcraft extendida)
     isAiming: false,
     lastFrameTime: 0,
 
@@ -81,7 +81,7 @@ const Game = {
         this.localPlayer.position.set(0, this.planetRadius, 0);
         this.localPlayer.forward.set(0, 0, -1).normalize();
         this.localPlayer.pitch = 0;
-        this.localPlayer.yawOffset = 0.35;
+        this.localPlayer.yawOffset = 0.22;
         this.localPlayer.altitude = 0;
         this.localPlayer.verticalVelocity = 0;
 
@@ -97,7 +97,6 @@ const Game = {
             InventoryModule.init();
         }
 
-        // Inicializar el módulo externo de controles
         if (typeof InputModule !== 'undefined') {
             InputModule.init(canvas);
         }
@@ -112,7 +111,7 @@ const Game = {
         this.localPlayer.forward.normalize();
 
         this.localPlayer.pitch -= e.movementY * sensitivity;
-        this.localPlayer.pitch = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, this.localPlayer.pitch));
+        this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
     },
 
     createShooterCrosshair() {
@@ -382,7 +381,6 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // Delegar actualización de la cámara al módulo especializado
             if (typeof CameraModule !== 'undefined') {
                 CameraModule.updateCamera(this.camera, p, this.cameraMode, R);
             }
