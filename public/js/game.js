@@ -15,7 +15,7 @@ const Game = {
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
-        yawOffset: 0.22, 
+        yawOffset: 0.0, 
         weaponRange: 15.0,
         radius: 0.08 
     },
@@ -124,7 +124,7 @@ const Game = {
 
         this.localPlayer.forward.set(0, 0, -1).normalize();
         this.localPlayer.pitch = 0;
-        this.localPlayer.yawOffset = 0.22;
+        this.localPlayer.yawOffset = 0.0;
         this.localPlayer.altitude = 0;
         this.localPlayer.verticalVelocity = 0;
 
@@ -155,6 +155,7 @@ const Game = {
 
     handleMouseMove(e) {
         const sensitivity = 0.003;
+        // Acumular el desplazamiento en yawOffset en lugar de rotar el vector forward directamente de forma errática
         this.localPlayer.yawOffset -= e.movementX * sensitivity;
         this.localPlayer.pitch -= e.movementY * sensitivity;
         this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
@@ -406,13 +407,15 @@ const Game = {
 
             let normal = p.position.clone().sub(planetGlobalCenter).normalize();
 
-            // Derivar vectores de movimiento directamente desde la orientación de la cámara proyectada en la superficie
-            const camDir = new THREE.Vector3();
-            this.camera.getWorldDirection(camDir);
-            
-            // Proyectar la dirección de la cámara sobre el plano tangente del planeta para eliminar bloqueos en polos
-            const forwardTangent = camDir.clone().sub(normal.clone().multiplyScalar(camDir.dot(normal))).normalize();
-            const rightTangent = new THREE.Vector3().crossVectors(forwardTangent, normal).normalize();
+            // Calcular el vector base de frente en la superficie usando el centro del planeta como referencia fija
+            const arbitraryRef = Math.abs(normal.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+            const tangentForward = new THREE.Vector3().crossVectors(arbitraryRef, normal).normalize();
+            const tangentRight = new THREE.Vector3().crossVectors(normal, tangentForward).normalize();
+
+            // Aplicar el yawOffset acumulado por el movimiento del ratón sobre la normal del planeta
+            const rotMatrixYaw = new THREE.Matrix4().makeRotationAxis(normal, p.yawOffset);
+            const baseForward = tangentForward.clone().applyMatrix4(rotMatrixYaw).normalize();
+            const baseRight = tangentRight.clone().applyMatrix4(rotMatrixYaw).normalize();
 
             let moveForward = 0;
             let moveSide = 0;
@@ -441,10 +444,10 @@ const Game = {
             }
 
             const targetPos = p.position.clone();
-            p.forward.copy(forwardTangent);
+            p.forward.copy(baseForward);
 
             if (moveForward !== 0 || moveSide !== 0) {
-                const moveDir = forwardTangent.clone().multiplyScalar(moveForward).add(rightTangent.clone().multiplyScalar(moveSide)).normalize();
+                const moveDir = baseForward.clone().multiplyScalar(moveForward).add(baseRight.clone().multiplyScalar(moveSide)).normalize();
                 
                 const axis = new THREE.Vector3().crossVectors(normal, moveDir).normalize();
                 const angle = p.speed / R;
@@ -452,6 +455,9 @@ const Game = {
                 targetPos.sub(planetGlobalCenter);
                 targetPos.applyAxisAngle(axis, angle);
                 targetPos.add(planetGlobalCenter);
+
+                // Actualizar la orientación hacia donde camina el personaje
+                p.forward.copy(moveDir);
             }
 
             targetPos.sub(planetGlobalCenter).normalize().multiplyScalar(R + p.altitude).add(planetGlobalCenter);
@@ -463,7 +469,10 @@ const Game = {
             normal = p.position.clone().sub(planetGlobalCenter).normalize();
             p.mesh.position.copy(p.position);
 
-            const rotMatrix = new THREE.Matrix4().makeBasis(rightTangent, normal, forwardTangent.clone().negate());
+            // Orientar el avatar alineado perfectamente con la superficie esférica
+            const currentRight = new THREE.Vector3().crossVectors(p.forward, normal).normalize();
+            const orthogonalForward = new THREE.Vector3().crossVectors(normal, currentRight).normalize();
+            const rotMatrix = new THREE.Matrix4().makeBasis(currentRight, normal, orthogonalForward.clone().negate());
             p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
             
             p.mesh.visible = (this.cameraMode !== 'first');
