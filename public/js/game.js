@@ -269,8 +269,7 @@ const Game = {
                 } 
                 // Verificar si es una roca y se puede minar
                 else if (typeof targetEntity.mine === 'function' && targetEntity.health > 0) {
-                    const gainedStone = targetEntity.mine();
-                    // Puedes manejar el recurso de piedra aquí si tienes un elemento UI para ello
+                    targetEntity.mine();
                 }
             }
         }
