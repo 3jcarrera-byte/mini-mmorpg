@@ -29,14 +29,15 @@ const TreeObject = (() => {
         // Posicionar el grupo exactamente en la superficie del planeta
         group.position.copy(position);
 
-        // 🌟 CORRECCIÓN DE ORIENTACIÓN: Alinear hacia afuera usando la normal de la esfera
+        // Orientación correcta hacia afuera usando la normal de la esfera
         const normal = position.clone().normalize();
         group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
 
+        // 🌟 Colisión ajustada al mínimo alrededor del tronco
         const colliderRef = {
             position: group.position.clone(),
-            radius: 0.18,
-            height: 0.6
+            radius: 0.12,
+            height: 0.4
         };
 
         const treeEntity = {
@@ -52,9 +53,11 @@ const TreeObject = (() => {
             seedTimer: 0,
 
             update(delta, scene, obstaclesList, allObjectsList) {
-                // Crecimiento fluido de brote a adulto (5 segundos para pruebas)
+                // 🌟 Tiempo de crecimiento exacto de 10 minutos (600 segundos)
+                const growthDuration = 10 * 60; 
+
                 if (this.state === 'sapling') {
-                    this.growthProgress += delta / 5.0; 
+                    this.growthProgress += delta / growthDuration; 
                     if (this.growthProgress >= 1.0) {
                         this.growthProgress = 1.0;
                         this.state = 'adult';
@@ -71,7 +74,7 @@ const TreeObject = (() => {
 
                 if (this.state === 'adult') {
                     this.seedTimer += delta;
-                    if (this.seedTimer > 15) { 
+                    if (this.seedTimer > 30) { 
                         this.seedTimer = 0;
                         this.trySpawnSeed(scene, obstaclesList, allObjectsList);
                     }
@@ -79,7 +82,7 @@ const TreeObject = (() => {
 
                 if (this.state === 'stump') {
                     this.regrowthTimer += delta;
-                    if (this.regrowthTimer > 10) { 
+                    if (this.regrowthTimer > 60) { // 1 minuto para rebrotar el tocón
                         this.regrowthTimer = 0;
                         this.state = 'sapling';
                         this.growthProgress = 0.3;
@@ -87,8 +90,8 @@ const TreeObject = (() => {
                         group.scale.setScalar(0.3);
                         group.children.forEach(child => child.visible = true);
                         
-                        this.collider.radius = 0.18;
-                        this.collider.height = 0.6;
+                        this.collider.radius = 0.12;
+                        this.collider.height = 0.4;
                     }
                 }
             },
@@ -106,8 +109,8 @@ const TreeObject = (() => {
                 });
 
                 group.scale.set(1, 0.25, 1);
-                this.collider.radius = 0.08;
-                this.collider.height = 0.15;
+                this.collider.radius = 0.06;
+                this.collider.height = 0.1;
             },
 
             trySpawnSeed(scene, obstaclesList, allObjectsList) {
