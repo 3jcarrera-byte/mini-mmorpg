@@ -4,7 +4,7 @@ const Game = {
     localPlayer: { 
         mesh: null, 
         speed: 0.03, 
-        jumpSpeed: 0.04,   
+        jumpSpeed: 0.04,    
         verticalVelocity: 0, 
         altitude: 0,      
         name: 'Héroe', 
@@ -25,6 +25,7 @@ const Game = {
     cameraMode: 'third',
     isAiming: false,
     lastFrameTime: 0,
+    currentPlanetKey: 'TEMPERATE_FOREST',
 
     setCameraMode(mode) {
         this.cameraMode = mode;
@@ -74,12 +75,34 @@ const Game = {
 
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-        WorldModule.createPlanet(this.scene, { color: 0x1a4314, treeCount: 40, rockCount: 20 });
+        // 🌟 CORRECCIÓN 2: Inicializar el Sol en el origen absoluto (0,0,0) mediante su módulo
+        if (typeof SunModule !== 'undefined') {
+            SunModule.create(this.scene);
+        }
+
+        // 🌟 CORRECCIÓN 1: Leer dinámicamente desde worldsConfig.js (PLANET_TYPES y STAR_SYSTEMS)
+        let selectedType = 'TEMPERATE_FOREST';
+        let orbitalDistance = 0;
+
+        if (typeof STAR_SYSTEMS !== 'undefined' && STAR_SYSTEMS.length > 0) {
+            const defaultSystem = STAR_SYSTEMS[0];
+            if (defaultSystem.planets && defaultSystem.planets.length > 0) {
+                selectedType = defaultSystem.planets[0].type;
+                orbitalDistance = defaultSystem.planets[0].orbitRadius || 0;
+            }
+        }
+
+        this.currentPlanetKey = selectedType;
+
+        if (typeof WorldModule !== 'undefined' && typeof WorldModule.createPlanet === 'function') {
+            WorldModule.createPlanet(this.scene, selectedType, orbitalDistance);
+        }
+
         if (typeof WorldModule.getRadius === 'function') {
             this.planetRadius = WorldModule.getRadius();
         }
 
-        this.localPlayer.position.set(0, this.planetRadius, 0);
+        this.localPlayer.position.set(orbitalDistance, this.planetRadius, 0);
         this.localPlayer.forward.set(0, 0, -1).normalize();
         this.localPlayer.pitch = 0;
         this.localPlayer.yawOffset = 0.22;
@@ -102,7 +125,6 @@ const Game = {
             InputModule.init(canvas);
         }
 
-        // 🌟 Asegurar que al hacer clic en el canvas del juego se reactive el control de la cámara
         canvas.addEventListener('click', () => {
             const inventoryModal = document.getElementById('inventory-modal');
             const isInvOpen = inventoryModal && inventoryModal.style.display === 'block';
@@ -237,7 +259,6 @@ const Game = {
             }
         }
 
-        // 🌟 Respaldo por proximidad ajustado estrictamente a 0.2 de distancia
         if (!targetEntity) {
             let closestObj = null;
             let minDist = 0.2; 
@@ -260,11 +281,13 @@ const Game = {
             targetEntity.mesh.getWorldPosition(worldPos);
             const distanceToTarget = this.localPlayer.position.distanceTo(worldPos);
             
-            // 🌟 Distancia de recolección estricta máxima de 0.3
             if (distanceToTarget > 0.3) {
                 console.log("Estás demasiado lejos del objeto.");
                 return;
             }
+
+            // Obtener índice o identificador único de la entidad para sincronización multijugador
+            const entityIndex = interactiveObjects.indexOf(targetEntity);
 
             if (typeof targetEntity.chopDown === 'function' && targetEntity.state !== 'stump') {
                 const amount = targetEntity.resourceAmount || 1;
@@ -273,12 +296,30 @@ const Game = {
                 if (typeof InventoryModule !== 'undefined') {
                     InventoryModule.addItem('wood', amount);
                 }
+
+                // 🌟 CORRECCIÓN 3: Sincronizar recolección con el servidor para evitar desincronización multijugador
+                if (this.socket) {
+                    this.socket.emit('gatherResource', { 
+                        type: 'wood', 
+                        amount: amount, 
+                        entityIndex: entityIndex 
+                    });
+                }
             } 
             else if (typeof targetEntity.mine === 'function' && targetEntity.isReady) {
                 const gainedStone = targetEntity.mine();
                 
                 if (gainedStone > 0 && typeof InventoryModule !== 'undefined') {
                     InventoryModule.addItem('stone', gainedStone);
+                }
+
+                // 🌟 CORRECCIÓN 3: Sincronizar minería con el servidor
+                if (this.socket) {
+                    this.socket.emit('gatherResource', { 
+                        type: 'stone', 
+                        amount: gainedStone, 
+                        entityIndex: entityIndex 
+                    });
                 }
             }
         }
