@@ -10,9 +10,9 @@ const CharacterModule = (() => {
     let mouse = new THREE.Vector2();
 
     const classes = [
-        { id: 'guerrero', name: 'Guerrero', color: 0xff0033, radius: 0.32, height: 1.1, stats: { str: 15, def: 12, spd: 8, agi: 7, mana: 5 } },
-        { id: 'mago', name: 'Mago', color: 0x0088ff, radius: 0.28, height: 1.15, stats: { str: 5, def: 6, spd: 10, agi: 8, mana: 20 } },
-        { id: 'arquero', name: 'Arquero', color: 0x00ff66, radius: 0.26, height: 1.12, stats: { str: 8, def: 8, spd: 14, agi: 15, mana: 10 } }
+        { id: 'humano', name: 'Humano', color: 0xff0033, radius: 0.32, height: 1.1, stats: { str: 15, def: 12, spd: 8, agi: 7, mana: 5 } },
+        { id: 'zerd', name: 'Zerd', color: 0x0088ff, radius: 0.28, height: 1.15, stats: { str: 5, def: 6, spd: 10, agi: 8, mana: 20 } },
+        { id: 'proto', name: 'Proto', color: 0x00ff66, radius: 0.26, height: 1.12, stats: { str: 8, def: 8, spd: 14, agi: 15, mana: 10 } }
     ];
 
     function init3D() {
