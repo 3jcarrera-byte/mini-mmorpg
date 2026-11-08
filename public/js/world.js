@@ -113,7 +113,7 @@ const WorldModule = (() => {
 
     // Crear la esfera atmosférica (Techo del planeta / Capa de ozono interactiva con la luz solar)
     function createAtmosphereLayer(scene, worldConfig) {
-        const atmosphereRadius = currentRadius * 1.15; // Ligeramente flotando sobre la superficie
+        const atmosphereRadius = currentRadius * 5; // Ligeramente flotando sobre la superficie
         const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
 
         const atmosColor = worldConfig.atmosphereColor || 0x75bbf9;
