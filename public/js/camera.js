@@ -21,7 +21,7 @@ const CameraModule = (() => {
             // 🌟 Cámara 2: Tercera persona estilo CODM (más pegada al hombro y cercana)
             const baseDistance = 1.2; 
             const baseHeight = 0.45;
-            const codmYawOffset = 0.22; // Desplazamiento lateral compacto tipo CODM
+            const codmYawOffset = 0.12; // Desplazamiento lateral compacto tipo CODM
             const pitchOffset = Math.sin(player.pitch) * 0.2;
 
             let camPos = player.position.clone()
@@ -45,7 +45,7 @@ const CameraModule = (() => {
         } else if (cameraMode === 'rts') {
             // 🌟 Cámara 3: Tipo Warcraft / RTS con límites verticales (pitch) muy amplios para mirar mucho más abajo y arriba
             const rtsHeight = 2.8; 
-            const rtsBack = 1.5;   
+            const rtsBack = 0.5;   
             
             // Rango vertical extendido: permite bajar mucho más hacia los pies/suelo y subir más arriba
             const rtsPitch = Math.max(-1.3, Math.min(0.6, player.pitch));
