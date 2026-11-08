@@ -372,3 +372,129 @@ const Game = {
 
             const rotatedObsPos = basePos.clone();
             rotatedObsPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), currentPlanetRotation);
+
+            const nextDist = nextPos.distanceTo(rotatedObsPos);
+            const obstacleRadius = obs.radius || 0.08;
+
+            if (nextDist < (playerRadius + obstacleRadius)) {
+                return true; 
+            }
+        }
+        return false;
+    },
+
+    loop() {
+        if (!this.isGameRunning) return;
+        requestAnimationFrame(() => this.loop());
+
+        const now = performance.now();
+        const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1);
+        this.lastFrameTime = now;
+
+        if (typeof WorldModule.rotatePlanet === 'function') {
+            WorldModule.rotatePlanet();
+        }
+
+        if (typeof WorldModule.updateEcosystem === 'function') {
+            WorldModule.updateEcosystem(delta, this.scene, WorldModule.getObstacles());
+        }
+
+        if (this.localPlayer.mesh) {
+            const p = this.localPlayer;
+            const crosshair = document.getElementById('game-crosshair');
+            let isMoving = false;
+
+            const R = this.planetRadius;
+            
+            // Obtener el centro móvil real del planeta actual en el espacio 3D de la galaxia
+            const planetMesh = (typeof WorldModule !== 'undefined' && typeof WorldModule.getPlanetMesh === 'function') ? WorldModule.getPlanetMesh() : null;
+            const planetGlobalCenter = new THREE.Vector3();
+            if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
+
+            // 🌟 Sincronización rotacional perfecta: Rotar la posición y orientación del jugador junto con el giro del planeta
+            const planetRotationStep = 0.001;
+            p.position.sub(planetGlobalCenter);
+            p.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
+            p.position.add(planetGlobalCenter);
+            p.forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
+
+            let normal = p.position.clone().sub(planetGlobalCenter).normalize();
+
+            p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
+            const right = new THREE.Vector3().crossVectors(p.forward, normal).normalize();
+
+            let moveForward = 0;
+            let moveSide = 0;
+
+            if (InputModule.isDown('KeyW') || InputModule.isDown('ArrowUp')) { moveForward += p.speed; isMoving = true; }
+            if (InputModule.isDown('KeyS') || InputModule.isDown('ArrowDown')) { moveForward -= p.speed; isMoving = true; }
+            if (InputModule.isDown('KeyA') || InputModule.isDown('ArrowLeft')) { moveSide -= p.speed; isMoving = true; }
+            if (InputModule.isDown('KeyD') || InputModule.isDown('ArrowRight')) { moveSide += p.speed; isMoving = true; }
+
+            if (InputModule.isDown('Space') && p.altitude <= 0.001) {
+                p.verticalVelocity = p.jumpSpeed;
+            }
+
+            p.verticalVelocity -= this.gravity;
+            p.altitude += p.verticalVelocity;
+
+            if (p.altitude <= 0) {
+                p.altitude = 0;
+                p.verticalVelocity = 0;
+            }
+
+            if (crosshair) {
+                crosshair.style.display = 'block';
+                const scale = isMoving ? 'scale(1.2)' : 'scale(1)';
+                crosshair.style.transform = `translate(-50%, -50%) ${scale}`;
+            }
+
+            const targetPos = p.position.clone();
+            const tempForward = p.forward.clone();
+
+            if (moveForward !== 0) {
+                const axis = new THREE.Vector3().crossVectors(normal, p.forward).normalize();
+                const angle = moveForward / R;
+                targetPos.applyAxisAngle(axis, angle);
+                tempForward.applyAxisAngle(axis, angle);
+            }
+
+            if (moveSide !== 0) {
+                const axis = new THREE.Vector3().crossVectors(normal, right).normalize();
+                const angle = moveSide / R;
+                targetPos.applyAxisAngle(axis, angle);
+                tempForward.applyAxisAngle(axis, angle);
+            }
+
+            // Normalización respetando el centro móvil del planeta flotante actual
+            targetPos.sub(planetGlobalCenter).normalize().multiplyScalar(R + p.altitude).add(planetGlobalCenter);
+
+            if (!this.checkCollision(targetPos, p.altitude)) {
+                p.position.copy(targetPos);
+                p.forward.copy(tempForward);
+            }
+
+            normal = p.position.clone().sub(planetGlobalCenter).normalize();
+            p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
+
+            p.mesh.position.copy(p.position);
+
+            const rotMatrix = new THREE.Matrix4().makeBasis(right, normal, p.forward.clone().negate());
+            p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
+            
+            p.mesh.visible = (this.cameraMode !== 'first');
+
+            if ((moveForward !== 0 || moveSide !== 0 || p.altitude > 0) && this.socket) {
+                this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
+            }
+
+            if (typeof CameraModule !== 'undefined') {
+                CameraModule.updateCamera(this.camera, p, this.cameraMode, R);
+            }
+        }
+
+        this.renderer.render(this.scene, this.camera);
+    }
+};
+
+window.GameModule = Game;
