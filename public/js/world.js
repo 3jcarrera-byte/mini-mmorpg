@@ -1,4 +1,4 @@
-// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Radios de Colisión Ajustados al Tamaño Real
+// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Sincronización de Rotación Planetaria
 const WorldModule = (() => {
     let planetMesh;
     let sunMesh, moonMesh;
@@ -104,7 +104,6 @@ const WorldModule = (() => {
         }
     }
 
-    // 🌟 Árbol con radio físico de colisión ajustado al tronco real (0.08)
     function createOptimizedTree(position) {
         const group = new THREE.Group();
         group.position.copy(position);
@@ -133,7 +132,7 @@ const WorldModule = (() => {
             state: 'adult', 
             resourceAmount: isSapling ? 5 : 15,
             respawnTimer: 0,
-            radius: 0.08, // 🌟 Ajustado al tronco real para evitar falsos bloqueos
+            radius: 0.08,
             height: 0.6 * scaleFactor,
             collider: { position: position, radius: 0.08, height: 0.6 * scaleFactor },
             chopDown() {
@@ -160,7 +159,6 @@ const WorldModule = (() => {
         return treeEntity;
     }
 
-    // 🌟 Piedra con radio físico de colisión ajustado al tamaño real (0.10)
     function createOptimizedRock(position) {
         const group = new THREE.Group();
         group.position.copy(position);
@@ -181,7 +179,7 @@ const WorldModule = (() => {
             isReady: true,
             resourceAmount: 10,
             respawnTimer: 0,
-            radius: 0.10, // 🌟 Ajustado al tamaño de la piedra
+            radius: 0.10,
             height: 0.2,
             collider: { position: position, radius: 0.10, height: 0.2 },
             mine() {
@@ -231,7 +229,8 @@ const WorldModule = (() => {
         updateEcosystem,
         getRadius: () => planetRadius,
         getObstacles: () => obstacles,
-        getInteractiveObjects: () => interactiveObjects
+        getInteractiveObjects: () => interactiveObjects,
+        getPlanetRotationY: () => planetMesh ? planetMesh.rotation.y : 0 // 🌟 Expone la rotación actual para sincronizar colisiones
     };
 })();
 
