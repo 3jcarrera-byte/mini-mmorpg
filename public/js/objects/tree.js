@@ -4,15 +4,23 @@ const TreeObject = (() => {
     function create(position, initialState = 'sapling', initialProgress = 0.2) {
         const group = new THREE.Group();
         
-        // Tronco
+        // 1. Tronco cilíndrico de color marrón
         const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.45, 6);
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9, flatShading: true });
+        const trunkMat = new THREE.MeshStandardMaterial({ 
+            color: 0x5c4033, 
+            roughness: 0.9, 
+            flatShading: true 
+        });
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
         trunk.position.y = 0.22;
         group.add(trunk);
 
-        // Copas en capas (estilo pino estilizado)
-        const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d8a39, roughness: 0.7, flatShading: true });
+        // 2. Capas de follaje (Pino estilizado en cono)
+        const leavesMat = new THREE.MeshStandardMaterial({ 
+            color: 0x2d8a39, 
+            roughness: 0.7, 
+            flatShading: true 
+        });
         
         const layer1 = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.45, 5), leavesMat);
         layer1.position.y = 0.45;
@@ -26,6 +34,7 @@ const TreeObject = (() => {
         layer3.position.y = 0.9;
         group.add(layer3);
 
+        // Posicionamiento y alineación con la esfera del planeta
         group.position.copy(position);
         group.lookAt(0, 0, 0);
         group.rotateX(Math.PI / 2);
@@ -50,9 +59,9 @@ const TreeObject = (() => {
             seedTimer: 0,
 
             update(delta, scene, obstaclesList, allObjectsList) {
-                // 1. Crecimiento de brote a adulto (Acelerado a 5 segundos para pruebas visuales inmediatas)
+                // Crecimiento progresivo del brote a adulto
                 if (this.state === 'sapling') {
-                    this.growthProgress += delta / 5.0; 
+                    this.growthProgress += delta / 5.0; // 5 segundos para pruebas visuales rápidas
                     if (this.growthProgress >= 1.0) {
                         this.growthProgress = 1.0;
                         this.state = 'adult';
@@ -63,7 +72,6 @@ const TreeObject = (() => {
                     return;
                 }
 
-                // 2. Generación de semillas en árboles adultos
                 if (this.state === 'adult') {
                     this.seedTimer += delta;
                     if (this.seedTimer > 15) { 
@@ -72,7 +80,6 @@ const TreeObject = (() => {
                     }
                 }
 
-                // 3. Sistema de retoño del tocón
                 if (this.state === 'stump') {
                     this.regrowthTimer += delta;
                     if (this.regrowthTimer > 10) { 
