@@ -25,8 +25,8 @@ const SunModule = (() => {
         sunMesh.position.set(position.x, position.y, position.z);
         scene.add(sunMesh);
 
-        // Luz puntual o direccional con mayor alcance para iluminar los mundos distantes
-        sunLight = new THREE.PointLight(0xffffff, 3.0, 3000, 0.4);
+        // Luz puntual con alcance ampliado (4000) y decaimiento optimizado (0.2) para cubrir todo el sistema de prueba
+        sunLight = new THREE.PointLight(0xffffff, 3.5, 4000, 0.2);
         sunLight.position.set(0, 0, 0);
         sunMesh.add(sunLight);
 
