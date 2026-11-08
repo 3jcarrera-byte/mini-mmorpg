@@ -270,7 +270,7 @@ const Game = {
 
             if (targetEntity) {
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
-                if (distanceToTarget > 2.0) {
+                if (distanceToTarget > this.localPlayer.weaponRange) {
                     console.log("Estás demasiado lejos del objeto.");
                     return;
                 }
@@ -413,18 +413,18 @@ const Game = {
             const rotMatrix = new THREE.Matrix4().makeBasis(right, normal, p.forward.clone().negate());
             p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
             
-            // Ocultar el avatar en primera persona, visible en tercera y RTS
+            // Avatar visible en tercera y RTS, oculto en primera persona
             p.mesh.visible = (this.cameraMode !== 'first');
 
             if ((moveForward !== 0 || moveSide !== 0 || p.altitude > 0) && this.socket) {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS SEPARADAS Y CORREGIDAS ---
+            // --- GESTIÓN DE CÁMARAS SEPARADAS Y OPTIMIZADAS ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
-                // 🌟 Primera persona real tipo Shooter: cámara en los ojos, ocultando el avatar
+                // 🌟 Primera persona real tipo Shooter limpia en los ojos
                 const eyeHeight = 0.38;
                 const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
                 this.camera.position.copy(eyePosition);
@@ -454,29 +454,4 @@ const Game = {
                 this.camera.lookAt(lookTarget);
 
             } else if (this.cameraMode === 'rts') {
-                // 🌟 Modo Warcraft / RTS: Vista cenital elevada limitando la movilidad más abajo de los pies (mirando al suelo/pies del personaje)
-                const rtsHeight = 3.5;
-                const rtsBack = 0.8;
-                
-                let camPos = p.position.clone()
-                    .add(normal.clone().multiplyScalar(rtsHeight))
-                    .sub(p.forward.clone().multiplyScalar(rtsBack));
-
-                const camNormal = camPos.clone().normalize();
-                if (camPos.length() < R + 0.3) {
-                    camPos.copy(camNormal.multiplyScalar(R + 0.3));
-                }
-
-                this.camera.position.copy(camPos);
-                
-                // Focalización limitada abajo de los pies / base del personaje
-                const footTarget = p.position.clone().add(normal.clone().multiplyScalar(0.05));
-                this.camera.lookAt(footTarget);
-            }
-        }
-
-        this.renderer.render(this.scene, this.camera);
-    }
-};
-
-window.GameModule = Game;
+                // 🌟 Modo Warcraft / RTS: Vista cenital elevada despejada, con abanico de pitch
