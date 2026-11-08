@@ -1,27 +1,27 @@
 // public/js/worldsConfig.js
 
-export const PLANET_TYPES = {
+window.PLANET_TYPES = {
   TEMPERATE_FOREST: {
     name: "Planeta Templado Boscoso",
-    radiusRange: [4.0, 7.0], // Variación de tamaño del mini planeta
+    radiusRange: [4.0, 7.0],
     gravity: 9.8,
     atmosphereColor: 0x87ceeb,
     dayNightCycleSpeed: 0.001,
     rotationSpeed: 0.005,
-    orbitalSpeed: 0.0002, // Traslación alrededor de la estrella
+    orbitalSpeed: 0.0002,
     hasOcean: true,
     oceanColor: 0x1e90ff,
-    oceanLevel: 0.95, // Altura respecto al radio del planeta
+    oceanLevel: 0.95,
     climate: {
-      baseTemperature: 22, // Celsius
+      baseTemperature: 22,
       weatherTypes: ["clear", "rain", "fog"],
     },
     biomes: ["grassland", "dense_forest", "rocky_hills", "river_bed"],
     colors: {
-      low: 0x2e5a1e,    // Valles y riberas
-      mid: 0x4a7c36,    // Praderas y bosques base
-      high: 0x8a8a8a,   // Colinas rocosas
-      peak: 0xffffff    // Cumbres nevadas
+      low: 0x2e5a1e,
+      mid: 0x4a7c36,
+      high: 0x8a8a8a,
+      peak: 0xffffff
     },
     resources: [
       { type: "tree", density: 40, rarity: "common" },
@@ -38,7 +38,7 @@ export const PLANET_TYPES = {
     rotationSpeed: 0.008,
     orbitalSpeed: 0.0004,
     hasOcean: true,
-    oceanColor: 0x3b0000, // Océano de lava
+    oceanColor: 0x3b0000,
     oceanLevel: 0.90,
     climate: {
       baseTemperature: 85,
@@ -46,10 +46,10 @@ export const PLANET_TYPES = {
     },
     biomes: ["obsidian_fields", "magma_rivers", "crater_ash", "sulfur_vents"],
     colors: {
-      low: 0x1a0500,    // Ríos de magma / depresiones profundas
-      mid: 0x3d1400,    // Campos de obsidiana y ceniza
-      high: 0x5e2605,   // Laderas volcánicas agrietadas
-      peak: 0x222222    // Picos de roca calcinada y azufre
+      low: 0x1a0500,
+      mid: 0x3d1400,
+      high: 0x5e2605,
+      peak: 0x222222
     },
     resources: [
       { type: "obsidian_rock", density: 50, rarity: "common" },
@@ -65,7 +65,7 @@ export const PLANET_TYPES = {
     rotationSpeed: 0.002,
     orbitalSpeed: 0.0001,
     hasOcean: true,
-    oceanColor: 0xadd8e6, // Océano congelado / agua fría
+    oceanColor: 0xadd8e6,
     oceanLevel: 0.97,
     climate: {
       baseTemperature: -35,
@@ -73,10 +73,10 @@ export const PLANET_TYPES = {
     },
     biomes: ["glacier_sheet", "frozen_tundra", "ice_spikes", "subglacial_volcano"],
     colors: {
-      low: 0x8ab6d6,    // Grietas de hielo profundo y lagos congelados
-      mid: 0xb0e0e6,    // Tundra helada y glaciares
-      high: 0xe0f7ff,   // Picos de hielo puro / ventisqueros
-      peak: 0x4a3b32    // Fumarolas o ceniza volcánica subglaciar permitida lógicamente
+      low: 0x8ab6d6,
+      mid: 0xb0e0e6,
+      high: 0xe0f7ff,
+      peak: 0x4a3b32
     },
     resources: [
       { type: "frozen_tree", density: 15, rarity: "uncommon" },
@@ -85,7 +85,7 @@ export const PLANET_TYPES = {
   }
 };
 
-export const STAR_SYSTEMS = [
+window.STAR_SYSTEMS = [
   {
     id: "system_alpha",
     name: "Sistema Alpha Centauri",
