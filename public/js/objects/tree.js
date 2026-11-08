@@ -1,7 +1,7 @@
 // Módulo Modularizado de Árboles (TreeObject)
 const TreeObject = (() => {
 
-    function create(position, initialState = 'sapling', initialProgress = 0.2) {
+    function create(position, initialState = 'adult', initialProgress = 1.0) {
         const group = new THREE.Group();
         
         // 1. Tronco cilíndrico
@@ -26,14 +26,11 @@ const TreeObject = (() => {
         layer3.position.y = 0.9;
         group.add(layer3);
 
-        // Posicionar el grupo exactamente en la superficie del planeta
         group.position.copy(position);
 
-        // Orientación correcta hacia afuera usando la normal de la esfera
         const normal = position.clone().normalize();
         group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
 
-        // 🌟 Colisión ajustada al mínimo alrededor del tronco
         const colliderRef = {
             position: group.position.clone(),
             radius: 0.12,
@@ -41,6 +38,7 @@ const TreeObject = (() => {
         };
 
         const treeEntity = {
+            type: 'tree', // 🌟 Sincronizado con game.js
             mesh: group,
             collider: colliderRef,
             resourceType: 'wood',
@@ -51,15 +49,12 @@ const TreeObject = (() => {
             regrowthTimer: 0,
             seedTimer: 0,
 
-            // 🌟 Cantidad de madera dinámica basada en el progreso de crecimiento (desde 1 hasta 15)
             get resourceAmount() {
                 if (this.state === 'adult') return 15;
-                // Escala progresiva de 1 a 15 según el crecimiento actual
                 return Math.max(1, Math.floor(this.growthProgress * 15));
             },
 
             update(delta, scene, obstaclesList, allObjectsList) {
-                // 🌟 Tiempo de crecimiento exacto de 1 minuto (60 segundos)
                 const growthDuration = 60; 
 
                 if (this.state === 'sapling') {
@@ -68,10 +63,8 @@ const TreeObject = (() => {
                         this.growthProgress = 1.0;
                         this.state = 'adult';
                         group.scale.set(1, 1, 1);
-                        // Asegurar visibilidad completa de todas las capas al ser adulto
                         group.children.forEach(child => child.visible = true);
                     } else {
-                        // Crecimiento gradual manteniendo estructura visible
                         const currentScale = Math.max(0.3, this.growthProgress);
                         group.scale.setScalar(currentScale);
                     }
@@ -88,7 +81,7 @@ const TreeObject = (() => {
 
                 if (this.state === 'stump') {
                     this.regrowthTimer += delta;
-                    if (this.regrowthTimer > 60) { // 1 minuto para rebrotar el tocón
+                    if (this.regrowthTimer > 60) {
                         this.regrowthTimer = 0;
                         this.state = 'sapling';
                         this.growthProgress = 0.3;
@@ -103,16 +96,14 @@ const TreeObject = (() => {
             },
 
             chopDown() {
-                // Permitir talar incluso si está creciendo para obtener la madera proporcional recolectada hasta el momento
                 if (this.state === 'stump') return;
 
                 this.state = 'stump';
                 this.health = 0;
                 this.regrowthTimer = 0;
 
-                // Dejar solo el tronco cortado (ocultamos las capas de follaje)
                 group.children.forEach((child, index) => {
-                    if (index > 0) child.visible = false; // Mantiene visible solo el tronco (índice 0)
+                    if (index > 0) child.visible = false;
                 });
 
                 group.scale.set(1, 0.25, 1);
@@ -163,9 +154,7 @@ const TreeObject = (() => {
         return treeEntity;
     }
 
-    return {
-        create
-    };
+    return { create };
 })();
 
 window.TreeObject = TreeObject;
