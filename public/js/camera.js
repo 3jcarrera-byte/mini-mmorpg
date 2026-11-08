@@ -24,7 +24,7 @@ const CameraModule = (() => {
             const codmYawOffset = 0.16; 
 
             // Ampliamos el rango inferior (primer valor más negativo, ej: -1.0) para que la mirilla baje hasta el suelo/pies
-            const codmPitch = Math.max(-0.5, Math.min(0.6, player.pitch));
+            const codmPitch = Math.max(-0.7, Math.min(0.6, player.pitch));
             const pitchOffset = Math.sin(codmPitch) * 0.2;
 
             let camPos = player.position.clone()
