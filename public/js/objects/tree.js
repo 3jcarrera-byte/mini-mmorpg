@@ -1,4 +1,4 @@
-// Módulo Simplificado de Árboles (TreeObject) - Solo Árbol Adulto
+// Módulo de Árboles (TreeObject) - Orientación Correcta hacia el Exterior
 const TreeObject = (() => {
 
     function create(position) {
@@ -12,7 +12,7 @@ const TreeObject = (() => {
             flatShading: true 
         });
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-        trunk.position.y = 0.45;
+        trunk.position.y = 0.45; // Hacia arriba desde la superficie
         group.add(trunk);
 
         // 2. Capas de follaje (Pino estilizado)
@@ -34,11 +34,12 @@ const TreeObject = (() => {
         layer3.position.y = 1.8;
         group.add(layer3);
 
-        // Alinear a la superficie esférica del planeta
+        // Posicionar el grupo exactamente en la superficie del planeta
         group.position.copy(position);
-        group.lookAt(0, 0, 0);
-        group.rotateX(Math.PI / 2);
-        group.position.addScaledVector(group.position.clone().normalize(), 0.05);
+
+        // Alinear la orientación para que crezca hacia afuera (alineado con la normal de la esfera)
+        const normal = position.clone().normalize();
+        group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
 
         const colliderRef = {
             position: group.position.clone(),
@@ -54,13 +55,11 @@ const TreeObject = (() => {
             state: 'adult',
             health: 100,
 
-            // Método update de relleno para que el bucle del ecosistema no falle
             update(delta, scene, obstaclesList, allObjectsList) {
                 // Sin cambios por ahora
             },
 
             chopDown() {
-                // Reducir escala visual al talar
                 group.scale.set(1, 0.2, 1);
                 this.collider.radius = 0.1;
             }
