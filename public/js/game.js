@@ -4,9 +4,9 @@ const Game = {
     localPlayer: { 
         mesh: null, 
         speed: 0.03, 
-        jumpSpeed: 0.04,   
+        jumpSpeed: 0.04,    
         verticalVelocity: 0, 
-        altitude: 0,      
+        altitude: 0,       
         name: 'Héroe', 
         level: 1, 
         classType: 'guerrero', 
@@ -16,7 +16,7 @@ const Game = {
         pitch: 0,
         yawOffset: 0.35, 
         weaponRange: 15.0,
-        radius: 0.08 
+        radius: 0.08 // Radio físico ultra compacto para evitar atascos en el terreno
     },
     remotePlayers: {},
     keys: {},
@@ -459,7 +459,8 @@ const Game = {
                 const rtsHeight = 3.0; 
                 const rtsBack = 1.8;   
                 
-                const rtsPitch = Math.max(-0.8, Math.min(0.35, p.pitch));
+                // 🌟 Abanico de pitch ajustado: límite inferior más bajo (hacia los pies sin pasar de largo) y superior reducido a la mitad
+                const rtsPitch = Math.max(-1.1, Math.min(0.18, p.pitch));
 
                 let camPos = p.position.clone()
                     .add(normal.clone().multiplyScalar(rtsHeight))
@@ -474,7 +475,7 @@ const Game = {
                 
                 const lookDir = p.forward.clone();
                 lookDir.applyAxisAngle(right, rtsPitch);
-                const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.2)).add(lookDir.multiplyScalar(p.weaponRange));
+                const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.05)).add(lookDir.multiplyScalar(p.weaponRange));
                 this.camera.lookAt(targetLookAt);
             }
         }
