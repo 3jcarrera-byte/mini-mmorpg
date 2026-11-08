@@ -1,4 +1,4 @@
-// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK)
+// Módulo de Mundo Esférico 
 const WorldModule = (() => {
     let planetMesh;
     let playerPos = { theta: 0, phi: Math.PI / 4 };
