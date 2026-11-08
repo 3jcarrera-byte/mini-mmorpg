@@ -1,9 +1,8 @@
-// Módulo de Inventario Translúcido, Minimizado y con Auto-organización (inventory.js)
+// Módulo de Inventario con Cierre por Movimiento y Drag & Drop (inventory.js)
 const InventoryModule = (() => {
-    const maxSlots = 20; // 4 filas x 5 columnas
+    const maxSlots = 20;
     let items = Array(maxSlots).fill(null);
     
-    // Recursos iniciales de prueba
     items[0] = { id: 1, type: 'wood', name: 'Madera', count: 100, icon: '🪵', color: '#e67e22' };
     items[1] = { id: 2, type: 'stone', name: 'Piedra', count: 0, icon: '🪨', color: '#95a5a6' };
 
@@ -18,7 +17,7 @@ const InventoryModule = (() => {
 
         const container = document.querySelector('.game-container') || document.body;
 
-        // 1. Botón mínimo flotante (Solo icono 🎒)
+        // Botón mínimo flotante (Solo icono 🎒)
         if (!document.getElementById('btn-inventory-toggle')) {
             const btnToggle = document.createElement('button');
             btnToggle.id = 'btn-inventory-toggle';
@@ -26,21 +25,14 @@ const InventoryModule = (() => {
             btnToggle.title = 'Bolso [B]';
             btnToggle.style.cssText = `
                 position: absolute; top: 15px; right: 15px; z-index: 50; 
-                width: 40px; height: 40px; background: rgba(15, 17, 23, 0.6); 
-                color: #fff; border: 1px solid rgba(255, 255, 255, 0.15); 
-                cursor: pointer; border-radius: 8px; font-size: 18px;
+                width: 38px; height: 38px; background: rgba(15, 17, 23, 0.5); 
+                color: #fff; border: 1px solid rgba(255, 255, 255, 0.12); 
+                cursor: pointer; border-radius: 8px; font-size: 16px;
                 display: flex; align-items: center; justify-content: center;
                 backdrop-filter: blur(4px); transition: all 0.2s ease;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             `;
-            btnToggle.onmouseover = () => { 
-                btnToggle.style.background = 'rgba(25, 30, 40, 0.85);'; 
-                btnToggle.style.transform = 'scale(1.05)';
-            };
-            btnToggle.onmouseout = () => { 
-                btnToggle.style.background = 'rgba(15, 17, 23, 0.6);'; 
-                btnToggle.style.transform = 'scale(1)';
-            };
+            btnToggle.onmouseover = () => { btnToggle.style.background = 'rgba(25, 30, 40, 0.85);'; };
+            btnToggle.onmouseout = () => { btnToggle.style.background = 'rgba(15, 17, 23, 0.5);'; };
             btnToggle.onclick = (e) => {
                 e.stopPropagation();
                 toggle();
@@ -48,13 +40,13 @@ const InventoryModule = (() => {
             container.appendChild(btnToggle);
         }
 
-        // 2. Ventana Modal Translúcida (Glassmorphism)
+        // Ventana Modal Translúcida
         const modal = document.createElement('div');
         modal.id = 'inventory-modal';
         modal.style.cssText = `
             display: none; position: absolute; top: 50%; left: 50%; 
             transform: translate(-50%, -50%); width: 360px; 
-            background: rgba(15, 17, 23, 0.78); 
+            background: rgba(15, 17, 23, 0.82); 
             border: 1px solid rgba(255, 255, 255, 0.12); padding: 20px; color: #fff; 
             z-index: 200; border-radius: 14px; font-family: monospace; 
             box-shadow: 0 20px 40px rgba(0,0,0,0.6);
@@ -69,15 +61,12 @@ const InventoryModule = (() => {
                     <h3 style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px; letter-spacing: 1px;">INVENTARIO</h3>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <button id="btn-auto-sort" title="Auto-arreglar / Organizar" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #00ffcc; padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 11px; cursor: pointer; transition: background 0.2s;">✨ Organizar</button>
-                    <button id="close-inv-btn" style="background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 16px; cursor: pointer; transition: color 0.2s;">✕</button>
+                    <button id="btn-auto-sort" title="Organizar automáticamente" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #00ffcc; padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 11px; cursor: pointer; transition: background 0.2s;">✨ Organizar</button>
+                    <button id="close-inv-btn" style="background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 16px; cursor: pointer;">✕</button>
                 </div>
             </div>
 
-            <!-- Cuadrícula de Slots -->
-            <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 2px;">
-                <!-- Se llena dinámicamente -->
-            </div>
+            <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 2px;"></div>
 
             <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; display: flex; justify-content: space-between; font-size: 10px; color: rgba(255,255,255,0.4);">
                 <span>Usados: <strong id="inv-capacity" style="color: rgba(255,255,255,0.8);">0/20</strong></span>
@@ -88,26 +77,25 @@ const InventoryModule = (() => {
 
         modal.addEventListener('click', (e) => e.stopPropagation());
 
-        // Botón de Auto-organizar (Auto-arreglar)
-        const sortBtn = modal.querySelector('#btn-auto-sort');
-        sortBtn.onmouseover = () => { sortBtn.style.background = 'rgba(0,255,204,0.15)'; };
-        sortBtn.onmouseout = () => { sortBtn.style.background = 'rgba(255,255,255,0.08)'; };
-        sortBtn.onclick = (e) => {
+        modal.querySelector('#btn-auto-sort').onclick = (e) => {
             e.stopPropagation();
             autoSortInventory();
         };
 
-        const closeBtn = modal.querySelector('#close-inv-btn');
-        closeBtn.onmouseover = () => { closeBtn.style.color = '#fff'; };
-        closeBtn.onmouseout = () => { closeBtn.style.color = 'rgba(255,255,255,0.5)'; };
-        closeBtn.onclick = (e) => {
+        modal.querySelector('#close-inv-btn').onclick = (e) => {
             e.stopPropagation();
             toggle();
         };
 
+        // Escuchar teclas globales (B para abrir/cerrar y W,A,S,D para cerrar si está abierto)
         window.addEventListener('keydown', (e) => {
+            const modalIsOpen = modal.style.display === 'block';
+
             if (e.code === 'KeyB') {
                 toggle();
+            } else if (modalIsOpen && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+                // Cerrar el inventario al presionar teclas de movimiento y volver al juego
+                modal.style.display = 'none';
             }
         });
 
@@ -136,7 +124,6 @@ const InventoryModule = (() => {
 
             slot.setAttribute('data-index', i);
 
-            // Drag & Drop nativo
             slot.addEventListener('dragstart', (e) => {
                 draggedIndex = i;
                 e.dataTransfer.setData('text/plain', i);
@@ -190,12 +177,8 @@ const InventoryModule = (() => {
         if (capacityEl) capacityEl.innerText = `${usedSlots}/${maxSlots}`;
     }
 
-    // Mecánica de Auto-organizar / Auto-arreglar el inventario
     function autoSortInventory() {
-        // 1. Extraer todos los ítems válidos
         let validItems = items.filter(i => i !== null && i.count > 0);
-        
-        // 2. Opcional: Fusionar ítems del mismo tipo si están separados
         let mergedMap = {};
         validItems.forEach(item => {
             if (mergedMap[item.type]) {
@@ -206,13 +189,9 @@ const InventoryModule = (() => {
         });
 
         let sortedList = Object.values(mergedMap);
-
-        // 3. Rellenar de nuevo el array de slots (primeros ordenados, resto vacíos `null`)
         items = Array(maxSlots).fill(null);
         sortedList.forEach((item, index) => {
-            if (index < maxSlots) {
-                items[index] = item;
-            }
+            if (index < maxSlots) items[index] = item;
         });
 
         renderGrid();
@@ -253,20 +232,11 @@ const InventoryModule = (() => {
                 };
             }
         }
-
         renderGrid();
-
-        if (type === 'wood') {
-            const woodHud = document.getElementById('ui-wood');
-            if (woodHud) woodHud.innerText = getData().wood;
-        }
     }
 
     function getData() {
-        let woodCount = 0;
-        let stoneCount = 0;
-        let used = 0;
-
+        let woodCount = 0, stoneCount = 0, used = 0;
         items.forEach(item => {
             if (item && item.count > 0) {
                 used++;
@@ -274,21 +244,10 @@ const InventoryModule = (() => {
                 if (item.type === 'stone') stoneCount += item.count;
             }
         });
-
-        return {
-            wood: woodCount,
-            stone: stoneCount,
-            slotsUsed: used
-        };
+        return { wood: woodCount, stone: stoneCount, slotsUsed: used };
     }
 
-    return {
-        init,
-        toggle,
-        addItem,
-        getData,
-        autoSortInventory
-    };
+    return { init, toggle, addItem, getData, autoSortInventory };
 })();
 
 window.InventoryModule = InventoryModule;
