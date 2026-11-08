@@ -1,9 +1,10 @@
-// Módulo de Mundo Esférico integrado con TreeObject y RockObject
+// public/js/world.js
+
 const WorldModule = (() => {
     let planetMesh;
     let sunMesh, moonMesh;
     let celestialOrbitGroup;
-    const planetRadius = 5;
+    let currentRadius = 5; // Radio base configurable
     const obstacles = []; 
     const interactiveObjects = []; 
 
@@ -11,7 +12,10 @@ const WorldModule = (() => {
         obstacles.length = 0;
         interactiveObjects.length = 0;
 
-        const planetGeo = new THREE.SphereGeometry(planetRadius, 32, 32);
+        // Permitir personalizar el radio desde la configuración del mundo o usar el valor por defecto
+        currentRadius = worldConfig.radius || 5;
+
+        const planetGeo = new THREE.SphereGeometry(currentRadius, 32, 32);
         const planetMat = new THREE.MeshStandardMaterial({ 
             color: worldConfig.color || 0x1a4314, 
             roughness: 0.8,
@@ -23,6 +27,7 @@ const WorldModule = (() => {
 
         createCelestialBodies(scene);
         generateFeatures(scene, planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
+        
         return planetMesh;
     }
 
@@ -54,8 +59,9 @@ const WorldModule = (() => {
 
     function generateFeatures(scene, containerMesh, trees, rocks) {
         const generatedPositions = [];
+        const totalItems = trees + rocks;
 
-        for (let i = 0; i < (trees + rocks); i++) {
+        for (let i = 0; i < totalItems; i++) {
             let position;
             let attempts = 0;
             let valid = false;
@@ -66,9 +72,9 @@ const WorldModule = (() => {
                 const theta = u * 2.0 * Math.PI;
                 const phi = Math.acos(2.0 * v - 1.0);
 
-                const x = planetRadius * Math.sin(phi) * Math.cos(theta);
-                const y = planetRadius * Math.sin(phi) * Math.sin(theta);
-                const z = planetRadius * Math.cos(phi);
+                const x = currentRadius * Math.sin(phi) * Math.cos(theta);
+                const y = currentRadius * Math.sin(phi) * Math.sin(theta);
+                const z = currentRadius * Math.cos(phi);
                 position = new THREE.Vector3(x, y, z);
 
                 valid = true;
@@ -79,32 +85,33 @@ const WorldModule = (() => {
                     }
                 }
                 attempts++;
-            } while (!valid && attempts < 10);
+            } while (!valid && attempts < 15);
 
-            generatedPositions.push(position);
+            if (valid) {
+                generatedPositions.push(position);
 
-            const isTree = i < trees;
-            let featureData;
+                const isTree = i < trees;
+                let featureData = null;
 
-            // 🌟 Uso formal de los módulos independientes con sus estados iniciales correctos
-            if (isTree) {
-                if (typeof TreeObject !== 'undefined') {
+                if (isTree && typeof TreeObject !== 'undefined') {
                     featureData = TreeObject.create(position, 'adult', 1.0);
-                }
-            } else {
-                if (typeof RockObject !== 'undefined') {
+                } else if (!isTree && typeof RockObject !== 'undefined') {
                     featureData = RockObject.create(position);
                 }
-            }
 
-            if (featureData) {
-                if (featureData.mesh) {
-                    containerMesh.add(featureData.mesh);
+                if (featureData) {
+                    if (featureData.mesh) {
+                        // Asegurar que el objeto mire hacia afuera desde el centro de la esfera
+                        featureData.mesh.position.copy(position);
+                        featureData.mesh.lookAt(planetMesh.position);
+                        featureData.mesh.rotateX(Math.PI / 2); // Ajuste de orientación local si el modelo lo requiere
+                        containerMesh.add(featureData.mesh);
+                    }
+                    if (featureData.collider && featureData.collider.active !== false) {
+                        obstacles.push(featureData.collider);
+                    }
+                    interactiveObjects.push(featureData);
                 }
-                if (featureData.collider && featureData.collider.active !== false) {
-                    obstacles.push(featureData.collider);
-                }
-                interactiveObjects.push(featureData);
             }
         }
     }
@@ -130,7 +137,7 @@ const WorldModule = (() => {
         createPlanet,
         rotatePlanet,
         updateEcosystem,
-        getRadius: () => planetRadius,
+        getRadius: () => currentRadius,
         getObstacles: () => obstacles,
         getInteractiveObjects: () => interactiveObjects,
         getPlanetRotationY: () => planetMesh ? planetMesh.rotation.y : 0
