@@ -244,14 +244,9 @@ const Game = {
         });
     },
 
-    // --- INTERACCIÓN DE TALA Y MINADO CON ACTUALIZACIÓN DE MATRICES Y RANGO 2.8 ---
+    // 🌟 2. Corrección del desfase de clic (Raycasting) sobre objetos en movimiento
     handleBuildClick(e) {
         if (e.button !== 0) return; 
-
-        // 🌟 Forzar actualización de matrices del mundo para corregir el desfase de raycasting por la rotación
-        if (this.scene) {
-            this.scene.updateMatrixWorld(true);
-        }
 
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2(0, 0); 
@@ -263,6 +258,13 @@ const Game = {
             if (obj.type === 'tree' && obj.state !== 'adult') return false;
             if (obj.type === 'stone' && !obj.isReady) return false;
             return true;
+        });
+
+        // Forzar actualización de las matrices globales de las mallas interactivas antes del raycast
+        interactiveObjects.forEach(obj => {
+            if (obj.mesh) {
+                obj.mesh.updateMatrixWorld(true);
+            }
         });
 
         const meshes = interactiveObjects.map(obj => obj.mesh);
@@ -305,7 +307,7 @@ const Game = {
         }
     },
 
-    // 🌟 Colisiones sincronizadas aplicando la rotación actual del planeta (planetMesh.rotation.y) a los obstáculos
+    // 🌟 1. Sincronización del sistema de colisiones con el giro del planeta
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -319,18 +321,18 @@ const Game = {
         if (!obstacles || obstacles.length === 0) return false;
 
         const playerRadius = this.localPlayer.radius;
-        const planetRotationY = (typeof WorldModule.getPlanetRotationY === 'function') ? WorldModule.getPlanetRotationY() : 0;
+        const currentPlanetRotation = (typeof WorldModule.getPlanetRotationY === 'function') ? WorldModule.getPlanetRotationY() : 0;
 
         for (let i = 0; i < obstacles.length; i++) {
             const obs = obstacles[i];
             const basePos = obs.position || obs; 
             if (!basePos) continue;
 
-            // Clonar y rotar la posición del obstáculo en el eje Y según la rotación actual del planeta
-            const obsPos = basePos.clone();
-            obsPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationY);
+            // Clonar la posición base y aplicar vectorialmente la rotación actual del planeta
+            const rotatedObsPos = basePos.clone();
+            rotatedObsPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), currentPlanetRotation);
 
-            const nextDist = nextPos.distanceTo(obsPos);
+            const nextDist = nextPos.distanceTo(rotatedObsPos);
             const obstacleRadius = obs.radius || 0.08;
 
             if (nextDist < (playerRadius + obstacleRadius)) {
