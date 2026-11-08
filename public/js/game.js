@@ -4,7 +4,7 @@ const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
         mesh: null, 
-        speed: 0.035, // Velocidad de zancada optimizada
+        speed: 0.035, 
         jumpSpeed: 0.045,    
         verticalVelocity: 0, 
         altitude: 0,      
@@ -155,16 +155,7 @@ const Game = {
 
     handleMouseMove(e) {
         const sensitivity = 0.003;
-        const planetMesh = (typeof WorldModule !== 'undefined' && typeof WorldModule.getPlanetMesh === 'function') ? WorldModule.getPlanetMesh() : null;
-        const planetGlobalCenter = new THREE.Vector3();
-        if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
-
-        const normal = this.localPlayer.position.clone().sub(planetGlobalCenter).normalize();
-        
-        const yawDelta = -e.movementX * sensitivity;
-        this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
-        this.localPlayer.forward.normalize();
-
+        this.localPlayer.yawOffset -= e.movementX * sensitivity;
         this.localPlayer.pitch -= e.movementY * sensitivity;
         this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
     },
@@ -407,25 +398,29 @@ const Game = {
             const planetGlobalCenter = new THREE.Vector3();
             if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
 
-            // Sincronización rotacional fluida alrededor del centro del planeta activo
+            // Sincronización rotacional fluida con el planeta activo
             const planetRotationStep = 0.001;
             p.position.sub(planetGlobalCenter);
             p.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
             p.position.add(planetGlobalCenter);
-            p.forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
 
             let normal = p.position.clone().sub(planetGlobalCenter).normalize();
 
-            p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
-            const right = new THREE.Vector3().crossVectors(p.forward, normal).normalize();
+            // Derivar vectores de movimiento directamente desde la orientación de la cámara proyectada en la superficie
+            const camDir = new THREE.Vector3();
+            this.camera.getWorldDirection(camDir);
+            
+            // Proyectar la dirección de la cámara sobre el plano tangente del planeta para eliminar bloqueos en polos
+            const forwardTangent = camDir.clone().sub(normal.clone().multiplyScalar(camDir.dot(normal))).normalize();
+            const rightTangent = new THREE.Vector3().crossVectors(forwardTangent, normal).normalize();
 
             let moveForward = 0;
             let moveSide = 0;
 
-            if (InputModule.isDown('KeyW') || InputModule.isDown('ArrowUp')) { moveForward += p.speed; isMoving = true; }
-            if (InputModule.isDown('KeyS') || InputModule.isDown('ArrowDown')) { moveForward -= p.speed; isMoving = true; }
-            if (InputModule.isDown('KeyA') || InputModule.isDown('ArrowLeft')) { moveSide -= p.speed; isMoving = true; }
-            if (InputModule.isDown('KeyD') || InputModule.isDown('ArrowRight')) { moveSide += p.speed; isMoving = true; }
+            if (InputModule.isDown('KeyW') || InputModule.isDown('ArrowUp')) { moveForward += 1; isMoving = true; }
+            if (InputModule.isDown('KeyS') || InputModule.isDown('ArrowDown')) { moveForward -= 1; isMoving = true; }
+            if (InputModule.isDown('KeyA') || InputModule.isDown('ArrowLeft')) { moveSide -= 1; isMoving = true; }
+            if (InputModule.isDown('KeyD') || InputModule.isDown('ArrowRight')) { moveSide += 1; isMoving = true; }
 
             if (InputModule.isDown('Space') && p.altitude <= 0.001) {
                 p.verticalVelocity = p.jumpSpeed;
@@ -446,35 +441,29 @@ const Game = {
             }
 
             const targetPos = p.position.clone();
-            const tempForward = p.forward.clone();
+            p.forward.copy(forwardTangent);
 
-            if (moveForward !== 0) {
-                const axis = new THREE.Vector3().crossVectors(normal, p.forward).normalize();
-                const angle = moveForward / R;
+            if (moveForward !== 0 || moveSide !== 0) {
+                const moveDir = forwardTangent.clone().multiplyScalar(moveForward).add(rightTangent.clone().multiplyScalar(moveSide)).normalize();
+                
+                const axis = new THREE.Vector3().crossVectors(normal, moveDir).normalize();
+                const angle = p.speed / R;
+                
+                targetPos.sub(planetGlobalCenter);
                 targetPos.applyAxisAngle(axis, angle);
-                tempForward.applyAxisAngle(axis, angle);
-            }
-
-            if (moveSide !== 0) {
-                const axis = new THREE.Vector3().crossVectors(normal, right).normalize();
-                const angle = moveSide / R;
-                targetPos.applyAxisAngle(axis, angle);
-                tempForward.applyAxisAngle(axis, angle);
+                targetPos.add(planetGlobalCenter);
             }
 
             targetPos.sub(planetGlobalCenter).normalize().multiplyScalar(R + p.altitude).add(planetGlobalCenter);
 
             if (!this.checkCollision(targetPos, p.altitude)) {
                 p.position.copy(targetPos);
-                p.forward.copy(tempForward);
             }
 
             normal = p.position.clone().sub(planetGlobalCenter).normalize();
-            p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
-
             p.mesh.position.copy(p.position);
 
-            const rotMatrix = new THREE.Matrix4().makeBasis(right, normal, p.forward.clone().negate());
+            const rotMatrix = new THREE.Matrix4().makeBasis(rightTangent, normal, forwardTangent.clone().negate());
             p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
             
             p.mesh.visible = (this.cameraMode !== 'first');
