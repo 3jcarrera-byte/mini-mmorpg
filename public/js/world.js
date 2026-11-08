@@ -42,13 +42,14 @@ const WorldModule = (() => {
         planetMesh.position.set(orbitRadius, 0, 0);
         scene.add(planetMesh);
 
+        // El generador de mundos orquesta internamente la creación de capas y elementos
         if (config.hasOcean !== false) {
-            createOceanLayer(scene, config);
+            createOceanLayer(config);
         }
 
-        createAtmosphereLayer(scene, config);
+        createAtmosphereLayer(config);
 
-        generateFeatures(scene, planetMesh, config.resources || config.treeCount || 40, config.rockCount || 20);
+        generateFeatures(planetMesh, config.resources || config.treeCount || 40, config.rockCount || 20);
         
         return planetMesh;
     }
@@ -61,13 +62,11 @@ const WorldModule = (() => {
             planetMesh = null;
         }
         if (oceanMesh) {
-            scene.remove(oceanMesh);
             oceanMesh.geometry.dispose();
             oceanMesh.material.dispose();
             oceanMesh = null;
         }
         if (atmosphereMesh) {
-            scene.remove(atmosphereMesh);
             atmosphereMesh.geometry.dispose();
             atmosphereMesh.material.dispose();
             atmosphereMesh = null;
@@ -95,7 +94,7 @@ const WorldModule = (() => {
         geometry.setAttribute('color', colorAttribute);
     }
 
-    function createOceanLayer(scene, config) {
+    function createOceanLayer(config) {
         const oceanRadius = currentRadius * (config.oceanLevel || 0.95);
         const oceanGeo = new THREE.SphereGeometry(oceanRadius, 32, 32);
         const isMagma = config.oceanColor === 0x3b0000 || config.name?.includes("Volcánico");
@@ -111,23 +110,23 @@ const WorldModule = (() => {
         });
 
         oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
-        // El océano sigue la posición del planeta
+        // El océano es hijo directo del planeta para acompañarlo en su rotación
         planetMesh.add(oceanMesh);
     }
 
-    function createAtmosphereLayer(scene, config) {
-        // CORRECCIÓN VISUAL: Capa envolvente grande estilo cúpula atmosférica con BackSide 
-        // para que se vea perfectamente desde la superficie sin quedar invisible u oculta.
-        const atmosphereRadius = currentRadius * 1.8; 
+    function createAtmosphereLayer(config) {
+        // CORRECCIÓN VISUAL: Usar FrontSide con un radio cercano y depthWrite: false 
+        // para que actúe como un halo atmosférico exterior limpio sin esferas negras o fantasmas internos.
+        const atmosphereRadius = currentRadius * 1.08; 
         const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
         
-        const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.55;
+        const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.45;
 
         const atmosphereMat = new THREE.MeshBasicMaterial({
             color: config.atmosphereColor || 0x87ceeb,
             transparent: true,
             opacity: density,
-            side: THREE.BackSide,
+            side: THREE.FrontSide,
             depthWrite: false
         });
 
@@ -136,7 +135,7 @@ const WorldModule = (() => {
         planetMesh.add(atmosphereMesh);
     }
 
-    function generateFeatures(scene, containerMesh, resourcesOrTrees, rocksCount) {
+    function generateFeatures(containerMesh, resourcesOrTrees, rocksCount) {
         const generatedPositions = [];
         let trees = 40;
         let rocks = 20;
