@@ -1,4 +1,4 @@
-// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Sincronización de Rotación Planetaria
+// Módulo de Mundo Esférico integrado con TreeObject y RockObject
 const WorldModule = (() => {
     let planetMesh;
     let sunMesh, moonMesh;
@@ -22,7 +22,7 @@ const WorldModule = (() => {
         scene.add(planetMesh);
 
         createCelestialBodies(scene);
-        generateFeatures(planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
+        generateFeatures(scene, planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
         return planetMesh;
     }
 
@@ -52,7 +52,7 @@ const WorldModule = (() => {
         celestialOrbitGroup.add(moonMesh);
     }
 
-    function generateFeatures(containerMesh, trees, rocks) {
+    function generateFeatures(scene, containerMesh, trees, rocks) {
         const generatedPositions = [];
 
         for (let i = 0; i < (trees + rocks); i++) {
@@ -86,124 +86,27 @@ const WorldModule = (() => {
             const isTree = i < trees;
             let featureData;
 
+            // 🌟 Uso formal de los módulos independientes con sus estados iniciales correctos
             if (isTree) {
-                featureData = createOptimizedTree(position);
+                if (typeof TreeObject !== 'undefined') {
+                    featureData = TreeObject.create(position, 'adult', 1.0);
+                }
             } else {
-                featureData = createOptimizedRock(position);
+                if (typeof RockObject !== 'undefined') {
+                    featureData = RockObject.create(position);
+                }
             }
 
             if (featureData) {
                 if (featureData.mesh) {
                     containerMesh.add(featureData.mesh);
                 }
-                if (featureData.collider) {
+                if (featureData.collider && featureData.collider.active !== false) {
                     obstacles.push(featureData.collider);
                 }
                 interactiveObjects.push(featureData);
             }
         }
-    }
-
-    function createOptimizedTree(position) {
-        const group = new THREE.Group();
-        group.position.copy(position);
-
-        const normal = position.clone().normalize();
-        group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
-
-        const isSapling = Math.random() < 0.4;
-        const scaleFactor = isSapling ? 0.6 : 1.0;
-
-        const trunkGeo = new THREE.CylinderGeometry(0.04 * scaleFactor, 0.06 * scaleFactor, 0.4 * scaleFactor, 6);
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9 });
-        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-        trunk.position.y = 0.2 * scaleFactor;
-        group.add(trunk);
-
-        const leavesGeo = new THREE.ConeGeometry(0.25 * scaleFactor, 0.6 * scaleFactor, 6);
-        const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d8a4e, roughness: 0.7 });
-        const leaves = new THREE.Mesh(leavesGeo, leavesMat);
-        leaves.position.y = 0.55 * scaleFactor;
-        group.add(leaves);
-
-        const treeEntity = {
-            type: 'tree',
-            mesh: group,
-            state: 'adult', 
-            resourceAmount: isSapling ? 5 : 15,
-            respawnTimer: 0,
-            radius: 0.08,
-            height: 0.6 * scaleFactor,
-            collider: { position: position, radius: 0.08, height: 0.6 * scaleFactor },
-            chopDown() {
-                this.state = 'stump';
-                this.resourceAmount = 0;
-                this.respawnTimer = 25.0; 
-                group.visible = false; 
-            },
-            respawn() {
-                this.state = 'adult';
-                this.resourceAmount = isSapling ? 5 : 15;
-                group.visible = true;
-            },
-            update(delta) {
-                if (this.state === 'stump') {
-                    this.respawnTimer -= delta;
-                    if (this.respawnTimer <= 0) {
-                        this.respawn();
-                    }
-                }
-            }
-        };
-
-        return treeEntity;
-    }
-
-    function createOptimizedRock(position) {
-        const group = new THREE.Group();
-        group.position.copy(position);
-
-        const normal = position.clone().normalize();
-        group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
-
-        const rockGeo = new THREE.DodecahedronGeometry(0.35, 1);
-        const rockMat = new THREE.MeshStandardMaterial({ color: 0x808588, roughness: 0.8, flatShading: true });
-        const mesh = new THREE.Mesh(rockGeo, rockMat);
-        mesh.scale.set(0.2, 0.2, 0.2); 
-        mesh.position.y = 0.0; 
-        group.add(mesh);
-
-        const rockEntity = {
-            type: 'stone',
-            mesh: group,
-            isReady: true,
-            resourceAmount: 10,
-            respawnTimer: 0,
-            radius: 0.10,
-            height: 0.2,
-            collider: { position: position, radius: 0.10, height: 0.2 },
-            mine() {
-                if (!this.isReady) return 0;
-                this.isReady = false;
-                this.respawnTimer = 20.0; 
-                mesh.visible = false;
-                return this.resourceAmount;
-            },
-            respawn() {
-                this.isReady = true;
-                mesh.visible = true;
-            },
-            update(delta) {
-                if (!this.isReady) {
-                    this.respawnTimer -= delta;
-                    if (this.respawnTimer <= 0) {
-                        this.respawn();
-                    }
-                }
-            }
-        };
-
-        return rockEntity;
     }
 
     function rotatePlanet() {
@@ -215,10 +118,10 @@ const WorldModule = (() => {
         }
     }
 
-    function updateEcosystem(delta, scene, obstaclesList) {
+    function updateEcosystem(delta, scene) {
         interactiveObjects.forEach(obj => {
             if (typeof obj.update === 'function') {
-                obj.update(delta, planetMesh, obstaclesList, interactiveObjects);
+                obj.update(delta, scene, obstacles, interactiveObjects);
             }
         });
     }
