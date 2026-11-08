@@ -216,40 +216,53 @@ const Game = {
         const meshes = interactiveObjects.map(obj => obj.mesh);
         const intersects = raycaster.intersectObjects(meshes, true);
 
+        let targetEntity = null;
+
         if (intersects.length > 0) {
             let hitObject = intersects[0].object;
-            let targetEntity = null;
-
-            // 🌟 Recorrido robusto hacia arriba en la jerarquía para encontrar la entidad padre correcta
             let currentObj = hitObject;
             while (currentObj) {
                 targetEntity = interactiveObjects.find(obj => obj.mesh === currentObj);
                 if (targetEntity) break;
                 currentObj = currentObj.parent;
             }
+        }
 
-            if (targetEntity) {
-                // 🌟 Distancia de recolección ajustada a 1.3 para que sea realista y precisa
-                const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
-                if (distanceToTarget > 1.3) {
-                    console.log("Estás demasiado lejos del objeto.");
-                    return;
+        // 🌟 Respaldo por proximidad (solución definitiva para el ecuador del planeta)
+        if (!targetEntity) {
+            let closestObj = null;
+            let minDist = 1.3; // Rango exacto de interacción
+
+            interactiveObjects.forEach(obj => {
+                const dist = this.localPlayer.position.distanceTo(obj.mesh.position);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestObj = obj;
                 }
+            });
+            targetEntity = closestObj;
+        }
 
-                if (typeof targetEntity.chopDown === 'function' && targetEntity.state === 'adult') {
-                    const amount = targetEntity.resourceAmount || 15;
-                    targetEntity.chopDown();
-                    
-                    if (typeof InventoryModule !== 'undefined') {
-                        InventoryModule.addItem('wood', amount);
-                    }
-                } 
-                else if (typeof targetEntity.mine === 'function' && targetEntity.isReady) {
-                    const gainedStone = targetEntity.mine();
-                    
-                    if (gainedStone > 0 && typeof InventoryModule !== 'undefined') {
-                        InventoryModule.addItem('stone', gainedStone);
-                    }
+        if (targetEntity) {
+            const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
+            if (distanceToTarget > 1.3) {
+                console.log("Estás demasiado lejos del objeto.");
+                return;
+            }
+
+            if (typeof targetEntity.chopDown === 'function' && targetEntity.state === 'adult') {
+                const amount = targetEntity.resourceAmount || 15;
+                targetEntity.chopDown();
+                
+                if (typeof InventoryModule !== 'undefined') {
+                    InventoryModule.addItem('wood', amount);
+                }
+            } 
+            else if (typeof targetEntity.mine === 'function' && targetEntity.isReady) {
+                const gainedStone = targetEntity.mine();
+                
+                if (gainedStone > 0 && typeof InventoryModule !== 'undefined') {
+                    InventoryModule.addItem('stone', gainedStone);
                 }
             }
         }
