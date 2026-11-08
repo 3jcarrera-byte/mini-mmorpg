@@ -143,13 +143,13 @@ const GalaxyModule = (() => {
 
             systemPositions.push(pos);
 
-            // Estrellas centrales (1 a 3 soles)
+            // Estrellas centrales masivas (1 a 3 soles) con tamaño de 16.0 a 20.0
             const sunCount = Math.random() < 0.65 ? 1 : (Math.random() < 0.88 ? 2 : 3);
             const suns = [];
             for (let i = 0; i < sunCount; i++) {
                 suns.push({
                     color: i === 0 ? 0xffd700 : (i === 1 ? 0xff4500 : 0x88ccff),
-                    radius: 3.5 + Math.random() * 1.5,
+                    radius: 16.0 + Math.random() * 4.0, // Rango estelar masivo corregido [16.0 - 20.0]
                     offset: i === 0 ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3((Math.random() - 0.5) * 12, 0, (Math.random() - 0.5) * 12)
                 });
             }
@@ -168,11 +168,11 @@ const GalaxyModule = (() => {
                 "BARREN_COLOSSUS"                                           // 6. Exterior masivo (<= 12.0)
             ];
 
-            let orbitalDistance = 25.0;
+            let orbitalDistance = 45.0; // Distancia inicial ajustada para evitar superposición con los soles gigantes (16-20)
             systemPlanetTypes.forEach((pType, index) => {
                 if (currentPlanetId > totalPlanetsTarget) return;
 
-                orbitalDistance += 16.0 + Math.random() * 6.0;
+                orbitalDistance += 22.0 + Math.random() * 8.0;
                 const archetype = PLANET_ARCHETYPES[pType];
                 
                 // Calcular radio aleatorio dentro del rango permitido (nunca > 12.0)
@@ -210,7 +210,7 @@ const GalaxyModule = (() => {
 
     /**
      * Procedural Generation by Demand: Carga el planeta activo del jugador,
-     * limpiando la memoria GPU y aplicando la traslación orbital atómica.
+     * limpiando la memoria GPU, posicionando los soles y pasando el radio exacto a WorldModule.
      */
     function loadPlanetScene(scene, planetId) {
         if (galaxyRegistry.length === 0) {
@@ -233,11 +233,12 @@ const GalaxyModule = (() => {
         // Encontrar el sistema estelar contenedor
         const starSystem = starSystems.find(sys => sys.systemId === planetData.systemId);
         
-        // Renderizar soles centrales
+        // Renderizar soles centrales masivos (16.0 - 20.0) en el origen del sistema estelar
         if (starSystem && typeof SunModule !== 'undefined') {
             starSystem.suns.forEach(sunConfig => {
                 SunModule.create(scene, { 
                     radius: sunConfig.radius, 
+                    color: sunConfig.color,
                     position: { 
                         x: starSystem.position.x + sunConfig.offset.x, 
                         y: starSystem.position.y + sunConfig.offset.y, 
@@ -247,12 +248,12 @@ const GalaxyModule = (() => {
             });
         }
 
-        // Instanciar el micro-planeta calculando su posición orbital en base a su ángulo inicial
+        // Instanciar el micro-planeta pasando explícitamente su radio dinámico y órbita global
         if (typeof WorldModule !== 'undefined' && typeof WorldModule.createPlanet === 'function') {
-            const planetMesh = WorldModule.createPlanet(scene, planetData.type, planetData.orbitRadius);
+            const planetMesh = WorldModule.createPlanet(scene, planetData.type, 0, planetData.radius);
             
             if (planetMesh && starSystem) {
-                // Aplicar ley de traslación atómica inicial
+                // Calcular la posición global 3D exacta basada en la ley de traslación atómica
                 const posX = starSystem.position.x + Math.cos(planetData.initialAngle) * planetData.orbitRadius;
                 const posZ = starSystem.position.z + Math.sin(planetData.initialAngle) * planetData.orbitRadius;
                 planetMesh.position.set(posX, starSystem.position.y, posZ);
