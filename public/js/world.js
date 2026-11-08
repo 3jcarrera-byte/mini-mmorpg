@@ -6,10 +6,12 @@ const WorldModule = (() => {
     let sunMesh, moonMesh;
     let celestialOrbitGroup;
     let currentRadius = 5; // Radio base configurable
+    let cachedScene = null; // Referencia a la escena para actualizar el fondo
     const obstacles = []; 
     const interactiveObjects = []; 
 
     function createPlanet(scene, worldConfig = {}) {
+        cachedScene = scene;
         obstacles.length = 0;
         interactiveObjects.length = 0;
 
@@ -38,14 +40,9 @@ const WorldModule = (() => {
         // Crear cuerpos celestes (Estrella y Luna)
         createCelestialBodies(scene);
 
-        // Generar recursos en la superficie (Árboles y Rocas)
+        // Generar recursos en la superficie (Árboles y Rocas perfectamente alineados)
         generateFeatures(scene, planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
         
-        // Inicializar partículas atmosféricas si el módulo está disponible
-        if (typeof WeatherParticlesModule !== 'undefined') {
-            WeatherParticlesModule.create(scene, currentRadius, worldConfig);
-        }
-
         return planetMesh;
     }
 
@@ -181,7 +178,7 @@ const WorldModule = (() => {
                     if (featureData.mesh) {
                         featureData.mesh.position.copy(position);
                         
-                        // CORRECCIÓN: Alinear el objeto verticalmente hacia afuera de la esfera (superficie)
+                        // Orientación vertical perfecta hacia el exterior de la esfera
                         const normal = position.clone().normalize();
                         featureData.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
                         
@@ -201,19 +198,32 @@ const WorldModule = (() => {
             planetMesh.rotation.y += 0.001;
         }
 
-        // Animación de flujo/marejada dinámica para el océano o lava
+        // Animación de flujo dinámico para el océano o lava
         if (oceanMesh) {
             oceanMesh.rotation.y -= 0.0006;
             oceanMesh.rotation.x += 0.0002;
         }
 
+        // Rotación de la órbita de los cuerpos celestes (Sol / Luna)
         if (celestialOrbitGroup) {
-            celestialOrbitGroup.rotation.y += 0.0002;
-        }
+            celestialOrbitGroup.rotation.y += 0.0003;
 
-        // Actualizar partículas atmosféricas si existen
-        if (typeof WeatherParticlesModule !== 'undefined') {
-            WeatherParticlesModule.update(delta);
+            // Transición dinámica del cielo (Día azul / Noche espacial) basada en la posición del sol
+            if (cachedScene && sunMesh) {
+                const sunWorldPos = new THREE.Vector3();
+                sunMesh.getWorldPosition(sunWorldPos);
+
+                // Altura Y del sol en el mundo
+                const sunHeight = sunWorldPos.y;
+                
+                // Mapear la altura del sol a un factor de mezcla (0 = Noche profunda, 1 = Día despejado)
+                let mixFactor = THREE.MathUtils.clamp((sunHeight + 5) / 15, 0, 1);
+
+                const nightSpaceColor = new THREE.Color(0x020208); // Negro espacio estelar
+                const daySkyColor     = new THREE.Color(0x75bbf9); // Azul cielo luminoso
+
+                cachedScene.background = new THREE.Color().lerpColors(nightSpaceColor, daySkyColor, mixFactor);
+            }
         }
     }
 
