@@ -1,3 +1,4 @@
+// Bucle principal del juego y control del cliente (game.js)
 const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
@@ -21,7 +22,7 @@ const Game = {
     isGameRunning: false,
     planetRadius: 5.0,
     gravity: 0.004,
-    cameraMode: 'third', // 'first' (1), 'third' (2 - CODM), 'rts' (3 - Warcraft extendida)
+    cameraMode: 'third', // 'first' (1), 'third' (2 - CODM), 'rts' (3 - Warcraft)
     isAiming: false,
     lastFrameTime: 0,
 
@@ -219,6 +220,7 @@ const Game = {
             let hitObject = intersects[0].object;
             let targetEntity = null;
 
+            // 🌟 Recorrido robusto hacia arriba en la jerarquía para encontrar la entidad padre correcta
             let currentObj = hitObject;
             while (currentObj) {
                 targetEntity = interactiveObjects.find(obj => obj.mesh === currentObj);
@@ -227,8 +229,9 @@ const Game = {
             }
 
             if (targetEntity) {
+                // 🌟 Distancia de recolección ajustada a 1.3 para que sea realista y precisa
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
-                if (distanceToTarget > 2.8) {
+                if (distanceToTarget > 1.3) {
                     console.log("Estás demasiado lejos del objeto.");
                     return;
                 }
