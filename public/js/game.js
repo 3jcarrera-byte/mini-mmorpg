@@ -16,7 +16,7 @@ const Game = {
         pitch: 0,
         yawOffset: 0.35, 
         weaponRange: 15.0,
-        radius: 0.08 // Radio físico ultra compacto para evitar atascos en el terreno
+        radius: 0.08 
     },
     remotePlayers: {},
     keys: {},
@@ -244,6 +244,7 @@ const Game = {
         });
     },
 
+    // --- INTERACCIÓN DE TALA Y MINADO CON RANGO 2.8 PARA COMPENSAR LA CURVATURA ESFÉRICA ---
     handleBuildClick(e) {
         if (e.button !== 0) return; 
 
@@ -274,8 +275,9 @@ const Game = {
             }
 
             if (targetEntity) {
+                // 🌟 Umbral compensado a 2.8 para resolver el fallo de curvatura en el planeta esférico
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
-                if (distanceToTarget > 2.0) {
+                if (distanceToTarget > 2.8) {
                     console.log("Estás demasiado lejos del objeto.");
                     return;
                 }
@@ -319,7 +321,7 @@ const Game = {
             if (!obsPos) continue;
 
             const nextDist = nextPos.distanceTo(obsPos);
-            const obstacleRadius = obs.radius || 0.15;
+            const obstacleRadius = obs.radius || 0.08;
 
             if (nextDist < (playerRadius + obstacleRadius)) {
                 return true; 
@@ -459,7 +461,6 @@ const Game = {
                 const rtsHeight = 3.0; 
                 const rtsBack = 1.8;   
                 
-                // 🌟 Abanico de pitch ajustado: límite inferior más bajo (hacia los pies sin pasar de largo) y superior reducido a la mitad
                 const rtsPitch = Math.max(-1.1, Math.min(0.18, p.pitch));
 
                 let camPos = p.position.clone()
