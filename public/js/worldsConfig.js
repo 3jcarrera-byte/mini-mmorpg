@@ -16,7 +16,13 @@ export const PLANET_TYPES = {
       baseTemperature: 22, // Celsius
       weatherTypes: ["clear", "rain", "fog"],
     },
-    biomes: ["forest", "meadow", "hills"],
+    biomes: ["grassland", "dense_forest", "rocky_hills", "river_bed"],
+    colors: {
+      low: 0x2e5a1e,    // Valles y riberas
+      mid: 0x4a7c36,    // Praderas y bosques base
+      high: 0x8a8a8a,   // Colinas rocosas
+      peak: 0xffffff    // Cumbres nevadas
+    },
     resources: [
       { type: "tree", density: 40, rarity: "common" },
       { type: "rock", density: 25, rarity: "common" },
@@ -38,7 +44,13 @@ export const PLANET_TYPES = {
       baseTemperature: 85,
       weatherTypes: ["ash_storm", "ember_rain"],
     },
-    biomes: ["obsidian_fields", "magma_rivers", "crater_ash"],
+    biomes: ["obsidian_fields", "magma_rivers", "crater_ash", "sulfur_vents"],
+    colors: {
+      low: 0x1a0500,    // Ríos de magma / depresiones profundas
+      mid: 0x3d1400,    // Campos de obsidiana y ceniza
+      high: 0x5e2605,   // Laderas volcánicas agrietadas
+      peak: 0x222222    // Picos de roca calcinada y azufre
+    },
     resources: [
       { type: "obsidian_rock", density: 50, rarity: "common" },
       { type: "sulfur_crystal", density: 20, rarity: "rare" }
@@ -59,7 +71,13 @@ export const PLANET_TYPES = {
       baseTemperature: -35,
       weatherTypes: ["blizzard", "snow"],
     },
-    biomes: ["glacier", "frozen_tundra", "ice_spikes"],
+    biomes: ["glacier_sheet", "frozen_tundra", "ice_spikes", "subglacial_volcano"],
+    colors: {
+      low: 0x8ab6d6,    // Grietas de hielo profundo y lagos congelados
+      mid: 0xb0e0e6,    // Tundra helada y glaciares
+      high: 0xe0f7ff,   // Picos de hielo puro / ventisqueros
+      peak: 0x4a3b32    // Fumarolas o ceniza volcánica subglaciar permitida lógicamente
+    },
     resources: [
       { type: "frozen_tree", density: 15, rarity: "uncommon" },
       { type: "cryo_crystal", density: 12, rarity: "rare" }
