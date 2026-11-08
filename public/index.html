@@ -1,1 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini MMORPG - Diablo Style</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
 
+    <!-- 1. PANTALLA LOGIN -->
+    <div id="screen-login" class="screen active">
+        <div class="box">
+            <h2>ARENA Y GLORIA</h2>
+            <h3>INICIAR SESIÓN</h3>
+            <input type="text" id="login-username" placeholder="Usuario">
+            <input type="password" id="login-password" placeholder="Contraseña">
+            <button id="btn-login" class="btn-large">ENTRAR AL REINO</button>
+            <button id="btn-to-register" class="btn-secondary">REGISTRARSE</button>
+            <button id="btn-to-forgot" class="btn-secondary" style="font-size: 10px; margin-top: 5px;">¿Olvidaste tu contraseña?</button>
+        </div>
+    </div>
+
+    <!-- 2. PANTALLA REGISTRO -->
+    <div id="screen-register" class="screen">
+        <div class="box">
+            <h2>CREAR CUENTA</h2>
+            <input type="text" id="reg-username" placeholder="Usuario">
+            <input type="email" id="reg-email" placeholder="Correo Electrónico">
+            <input type="password" id="reg-password" placeholder="Contraseña">
+            <button id="btn-register-submit" class="btn-large">REGISTRARSE</button>
+            <button id="btn-back-to-login" class="btn-secondary">VOLVER AL LOGIN</button>
+        </div>
+    </div>
+
+    <!-- 3. PANTALLA RECUPERAR CLAVE / SOPORTE -->
+    <div id="screen-forgot" class="screen">
+        <div class="box">
+            <h2>RECUPERAR CLAVE</h2>
+            <p style="font-size: 11px; color: #aaa;">Se enviará una solicitud de recuperación a soporte técnico.</p>
+            <input type="email" id="forgot-email" placeholder="Tu Correo Registrado">
+            <button id="btn-send-support" class="btn-large">ENVIAR CORREO A SOPORTE</button>
+            <button id="btn-forgot-to-login" class="btn-secondary">CANCELAR</button>
+        </div>
+    </div>
+
+    <!-- 4. PANTALLA SELECCIÓN / CREACIÓN (CINEMÁTICA 3D) -->
+    <div id="screen-character" class="screen full-cinematic">
+        <canvas id="characterCanvas" class="cinematic-canvas"></canvas>
+
+        <div id="panel-top-name" class="panel-top-name" style="display: none;">
+            <h2 id="char-display-name" style="margin: 0; font-size: 16px;">CLASE: GUERRERO</h2>
+        </div>
+
+        <!-- Flechas de Selección 3D de Clase (Solo en modo creación) -->
+        <button id="btn-arrow-left" class="btn-arrow arrow-left">&lt;</button>
+        <button id="btn-arrow-right" class="btn-arrow arrow-right">&gt;</button>
+
+        <!-- Panel Derecho Vertical: Atributos de la Clase (Estilo RPG) -->
+        <div id="panel-attributes" class="attributes-panel" style="display: none;">
+            <h3>ATRIBUTOS</h3>
+            <div class="stat-row"><span>Fuerza:</span> <span id="stat-str">--</span></div>
+            <div class="stat-row"><span>Defensa:</span> <span id="stat-def">--</span></div>
+            <div class="stat-row"><span>Velocidad:</span> <span id="stat-spd">--</span></div>
+            <div class="stat-row"><span>Agilidad:</span> <span id="stat-agi">--</span></div>
+            <div class="stat-row"><span>Maná:</span> <span id="stat-mana">--</span></div>
+        </div>
+
+        <!-- Panel Central Inferior Minimalista -->
+        <div class="mu-select-panel">
+            <h3 id="panel-instruction" style="font-size: 13px; margin-bottom: 6px; letter-spacing: 1px;">HAZ CLIC EN TU HÉROE</h3>
+
+            <!-- Botones de Selección y Gestión de Héroes Existentes -->
+            <button id="btn-play" class="btn-large" style="display: none; background: #8b0000; border-color: #ffd700;">ENTRAR AL MUNDO</button>
+            <button id="btn-to-create" class="btn-secondary">+ NUEVO HÉROE</button>
+            <button id="btn-delete-hero" class="btn-danger" style="display: none;">ELIMINAR HÉROE</button>
+            <button id="btn-logout" class="btn-secondary" style="font-size: 11px; padding: 6px;">CERRAR SESIÓN</button>
+
+            <!-- Controles de Creación de Personaje (Ocultos hasta pulsar Nuevo Héroe) -->
+            <div id="panel-create-controls" class="creation-controls">
+                <input type="text" id="create-char-name" placeholder="Nombre del Héroe" maxlength="15">
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <button id="btn-confirm-create" class="btn-large" style="background: #114411;">CREAR</button>
+                    <button id="btn-cancel-create" class="btn-secondary" style="width: 40%; margin: 6px 0;">CANCELAR</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE DOBLE CONFIRMACIÓN PARA ELIMINAR HÉROE -->
+        <div id="delete-modal" class="modal-overlay" style="display: none;">
+            <div class="box" style="width: 380px;">
+                <h3 style="color: #ff4444;">¡ADVERTENCIA DE BORRADO!</h3>
+                <p id="delete-warning-text" style="font-size: 12px; color: #ccc; margin-bottom: 15px; line-height: 1.4;"></p>
+                <input type="text" id="delete-confirm-input" placeholder="Escribe el nombre del héroe">
+                <input type="text" id="delete-confirm-input" placeholder="Escribe el nombre del héroe" autocapitalize="off" spellcheck="false">
+                <div style="display: flex; gap: 8px; margin-top: 15px;">
+                    <button id="btn-confirm-delete" class="btn-danger">CONFIRMAR BORRADO</button>
+                    <button id="btn-cancel-delete" class="btn-secondary">CANCELAR</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. PANTALLA JUEGO -->
+    <div id="screen-game" class="screen">
+        <div class="game-container">
+            <canvas id="mapCanvas" width="800" height="600"></canvas>
+            <div class="hud" style="display: flex; justify-content: space-between; align-items: center; width: 800px;">
+                <div>
+                    <span id="hud-char-name"></span> | HP: <span id="hud-hp">100/100</span>
+                </div>
+                <button id="btn-return-menu" class="btn-secondary" style="width: auto; padding: 4px 12px; margin: 0; font-size: 11px;">SALIR AL MENÚ</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/character.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
