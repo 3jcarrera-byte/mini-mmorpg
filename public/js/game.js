@@ -454,4 +454,34 @@ const Game = {
                 this.camera.lookAt(lookTarget);
 
             } else if (this.cameraMode === 'rts') {
-                // 🌟 Modo Warcraft / RTS: Vista cenital elevada despejada, con abanico de pitch
+                // 🌟 Modo Warcraft / RTS: Vista cenital elevada despejada, con abanico de pitch acotado (desde los pies hasta el rango frontal de apuntado)
+                const rtsHeight = 4.2;
+                const rtsBack = 2.5;
+                
+                // Abanico de grados equivalente (desde mirar abajo hacia los pies hasta un ángulo frontal/superior de 320° a 40°)
+                const rtsPitch = Math.max(-0.8, Math.min(0.35, p.pitch));
+
+                let camPos = p.position.clone()
+                    .add(normal.clone().multiplyScalar(rtsHeight))
+                    .sub(p.forward.clone().multiplyScalar(rtsBack));
+
+                const camNormal = camPos.clone().normalize();
+                if (camPos.length() < R + 0.3) {
+                    camPos.copy(camNormal.multiplyScalar(R + 0.3));
+                }
+
+                this.camera.position.copy(camPos);
+                
+                // Apuntado dentro del abanico del personaje hasta el alcance del arma
+                const lookDir = p.forward.clone();
+                lookDir.applyAxisAngle(right, rtsPitch);
+                const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.2)).add(lookDir.multiplyScalar(p.weaponRange));
+                this.camera.lookAt(targetLookAt);
+            }
+        }
+
+        this.renderer.render(this.scene, this.camera);
+    }
+};
+
+window.GameModule = Game;
