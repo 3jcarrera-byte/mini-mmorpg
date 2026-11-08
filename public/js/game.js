@@ -93,7 +93,9 @@ const Game = {
             const targetPlanetData = registry.find(p => p.id === activePlanetId);
             
             if (targetPlanetData) {
-                this.currentPlanetKey = targetPlanetData.type;
+                // Mapeo seguro con soporte para ambas claves (planetTypeKey o type)
+                this.currentPlanetKey = targetPlanetData.planetTypeKey || targetPlanetData.type || 'TEMPERATE_FOREST';
+                this.planetRadius = targetPlanetData.radius || 5.0;
                 activePlanetMesh = GalaxyModule.loadPlanetScene(this.scene, activePlanetId);
             }
         }
