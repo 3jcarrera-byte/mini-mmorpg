@@ -18,11 +18,15 @@ const CameraModule = (() => {
             camera.lookAt(targetLookAt);
 
         } else if (cameraMode === 'third') {
-            // 🌟 Cámara 2: Tercera persona estilo CODM (más pegada al hombro y cercana)
+            // 🌟 Cámara 2: Tercera persona estilo CODM con límite inferior de la mirilla ajustado
             const baseDistance = 1.2; 
-            const baseHeight =1;
-            const codmYawOffset = 0.16; // Desplazamiento lateral compacto tipo CODM
-            const pitchOffset = Math.sin(player.pitch) * 0.2;
+            const baseHeight = 1;
+            const codmYawOffset = 0.16; 
+
+            // Restringir el pitch en cámara 2 para que el límite inferior no baje demasiado de golpe
+            // Ajusta -0.3 (límite inferior) y 0.5 (límite superior) según prefieras
+            const codmPitch = Math.max(-0.1, Math.min(0.5, player.pitch));
+            const pitchOffset = Math.sin(codmPitch) * 0.2;
 
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(baseHeight + pitchOffset))
@@ -36,19 +40,18 @@ const CameraModule = (() => {
 
             camera.position.copy(camPos);
             
-            // Punto de mira enfocado al frente del personaje con su pitch actual
             const lookDir = player.forward.clone();
-            lookDir.applyAxisAngle(right, player.pitch);
+            lookDir.applyAxisAngle(right, codmPitch);
             const lookTarget = player.position.clone().add(normal.clone().multiplyScalar(0.3)).add(lookDir.multiplyScalar(player.weaponRange));
             camera.lookAt(lookTarget);
 
         } else if (cameraMode === 'rts') {
-            // 🌟 Cámara 3: Tipo Warcraft / RTS con límites verticales (pitch) muy amplios para mirar mucho más abajo y arriba
+            // 🌟 Cámara 3: Tipo Warcraft / RTS con límite SUPERIOR ajustado (evita que suba demasiado la vista)
             const rtsHeight = 2.8; 
             const rtsBack = 2.5;   
             
-            // Rango vertical extendido: permite bajar mucho más hacia los pies/suelo y subir más arriba
-            const rtsPitch = Math.max(-0.8, Math.min(0.6, player.pitch));
+            // Límite superior ajustado: El segundo valor (0.2 o 0.15) frena hasta dónde puede subir la mirilla hacia arriba
+            const rtsPitch = Math.max(-0.8, Math.min(0.02, player.pitch));
 
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(rtsHeight))
