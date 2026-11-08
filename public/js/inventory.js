@@ -1,14 +1,14 @@
-// Módulo de Inventario con Stacks de 100, División de Ítems, Drag & Drop y Cierre por Movimiento (inventory.js)
+// Módulo de Inventario con Stacks de 100, División con tecla C y Drag & Drop (inventory.js)
 const InventoryModule = (() => {
     const maxSlots = 20;
     const maxStackSize = 100;
     let items = Array(maxSlots).fill(null);
     
-    // Inicialización por defecto de muestra
     items[0] = { id: 1, type: 'wood', name: 'Madera', count: 100, icon: '🪵', color: '#e67e22' };
     items[1] = { id: 2, type: 'stone', name: 'Piedra', count: 25, icon: '🪨', color: '#95a5a6' };
 
     let draggedIndex = null;
+    let hoveredSlotIndex = null; // 🌟 Rrastrea sobre qué ranura está el cursor para la tecla C
 
     function init() {
         createUI();
@@ -19,7 +19,6 @@ const InventoryModule = (() => {
 
         const container = document.querySelector('.game-container') || document.body;
 
-        // Botón mínimo flotante (Solo icono 🎒)
         if (!document.getElementById('btn-inventory-toggle')) {
             const btnToggle = document.createElement('button');
             btnToggle.id = 'btn-inventory-toggle';
@@ -42,7 +41,6 @@ const InventoryModule = (() => {
             container.appendChild(btnToggle);
         }
 
-        // Ventana Modal Translúcida
         const modal = document.createElement('div');
         modal.id = 'inventory-modal';
         modal.style.cssText = `
@@ -72,7 +70,7 @@ const InventoryModule = (() => {
 
             <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; display: flex; justify-content: space-between; font-size: 10px; color: rgba(255,255,255,0.4);">
                 <span>Usados: <strong id="inv-capacity" style="color: rgba(255,255,255,0.8);">0/20</strong></span>
-                <span>Arrastra • <strong style="color: rgba(255,255,255,0.8);">Clic der.</strong> dividir</span>
+                <span>Arrastra • <strong style="color: rgba(255,255,255,0.8);">[C]</strong> dividir pila</span>
             </div>
         `;
         container.appendChild(modal);
@@ -89,12 +87,17 @@ const InventoryModule = (() => {
             toggle();
         };
 
-        // Escuchar teclas globales (B para abrir/cerrar y W,A,S,D para cerrar si está abierto)
+        // Escuchar teclas globales (B, C para dividir y movimiento W,A,S,D para cerrar)
         window.addEventListener('keydown', (e) => {
             const modalIsOpen = modal.style.display === 'block';
 
             if (e.code === 'KeyB') {
                 toggle();
+            } else if (modalIsOpen && e.code === 'KeyC') {
+                // 🌟 Presionar C sobre la ranura activa abre el menú de división
+                if (hoveredSlotIndex !== null && items[hoveredSlotIndex] && items[hoveredSlotIndex].count > 1) {
+                    openSplitModal(hoveredSlotIndex, items[hoveredSlotIndex]);
+                }
             } else if (modalIsOpen && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
                 modal.style.display = 'none';
             }
@@ -125,6 +128,10 @@ const InventoryModule = (() => {
             `;
 
             slot.setAttribute('data-index', i);
+
+            // 🌟 Control de qué ranura tiene el cursor encima
+            slot.addEventListener('mouseenter', () => { hoveredSlotIndex = i; });
+            slot.addEventListener('mouseleave', () => { if (hoveredSlotIndex === i) hoveredSlotIndex = null; });
 
             slot.addEventListener('dragstart', (e) => {
                 draggedIndex = i;
@@ -157,7 +164,6 @@ const InventoryModule = (() => {
                     const sourceItem = items[sourceIndex];
                     const targetItem = items[targetIndex];
 
-                    // Si ambos son del mismo tipo y no están al máximo, intentar fusionar stacks
                     if (sourceItem && targetItem && sourceItem.type === targetItem.type && targetItem.count < maxStackSize) {
                         let totalCount = targetItem.count + sourceItem.count;
                         if (totalCount <= maxStackSize) {
@@ -168,19 +174,10 @@ const InventoryModule = (() => {
                             sourceItem.count = totalCount - maxStackSize;
                         }
                     } else {
-                        // Intercambio normal de ranuras
                         items[sourceIndex] = targetItem;
                         items[targetIndex] = sourceItem;
                     }
                     renderGrid();
-                }
-            });
-
-            // 🌟 Clic derecho para dividir stack de ítems
-            slot.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                if (slotItem && slotItem.count > 1) {
-                    openSplitModal(i, slotItem);
                 }
             });
 
@@ -202,7 +199,6 @@ const InventoryModule = (() => {
         if (capacityEl) capacityEl.innerText = `${usedSlots}/${maxSlots}`;
     }
 
-    // 🌟 Ventana flotante interactiva para elegir la cantidad exacta a dividir
     function openSplitModal(index, item) {
         if (document.getElementById('split-dialog')) return;
 
@@ -221,7 +217,7 @@ const InventoryModule = (() => {
         `;
 
         dialog.innerHTML = `
-            <h4 style="margin: 0 0 10px 0; font-size: 13px; color: #00ffcc;">DIVIDIR ${item.name.toUpperCase()}</h4>
+            <h4 style="margin: 0 0 10px 0; font-size: 13px; color: #00ffcc;">DIVIDIR ${item.name.toUpperCase()} [C]</h4>
             <div style="font-size: 24px; margin-bottom: 10px;">${item.icon}</div>
             <input type="range" id="split-range" min="1" max="${maxSplit}" value="${splitValue}" style="width: 80%; cursor: pointer; accent-color: #00ffcc; margin-bottom: 10px;">
             <div style="font-size: 14px; margin-bottom: 15px;">Cantidad: <strong id="split-val-text" style="color: #00ffcc;">${splitValue}</strong></div>
@@ -277,13 +273,11 @@ const InventoryModule = (() => {
         renderGrid();
     }
 
-    // 🌟 Añadir ítems respetando rigurosamente el límite de 100 por stack y creando nuevas pilas si se llena
     function addItem(type, amount) {
         let remaining = amount;
         const icons = { wood: '🪵', stone: '🪨' };
         const colors = { wood: '#e67e22', stone: '#bdc3c7' };
 
-        // 1. Rellenar pilas existentes del mismo tipo que no alcancen 100
         for (let i = 0; i < maxSlots && remaining > 0; i++) {
             let slot = items[i];
             if (slot && slot.type === type && slot.count < maxStackSize) {
@@ -294,7 +288,6 @@ const InventoryModule = (() => {
             }
         }
 
-        // 2. Colocar el sobrante en ranuras vacías creando nuevos stacks de hasta 100
         while (remaining > 0) {
             let emptyIndex = items.findIndex(slot => slot === null);
             if (emptyIndex === -1) {
@@ -317,7 +310,6 @@ const InventoryModule = (() => {
         renderGrid();
     }
 
-    // Organizar y fusionar automáticamente agrupando por tipo
     function autoSortInventory() {
         let allValidItems = [];
         items.forEach(slot => {
@@ -326,7 +318,6 @@ const InventoryModule = (() => {
             }
         });
 
-        // Agrupar por tipo de ítem sumando conteos
         let mergedMap = {};
         allValidItems.forEach(item => {
             if (!mergedMap[item.type]) {
@@ -338,7 +329,6 @@ const InventoryModule = (() => {
         items = Array(maxSlots).fill(null);
         let currentIndex = 0;
 
-        // Redistribuir respetando el máximo de 100 por stack
         Object.values(mergedMap).forEach(itemData => {
             let rem = itemData.count;
             while (rem > 0 && currentIndex < maxSlots) {
