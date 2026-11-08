@@ -32,11 +32,12 @@ const RockObject = (() => {
         // Desplazamiento leve para asegurar que no se hundan
         group.position.addScaledVector(normal, 0.02);
 
-        // 🌟 Colisión reducida y ajustada al mínimo preciso
+        // Referencia de colisión configurable
         const colliderRef = {
             position: group.position.clone(),
             radius: 0.12,
-            height: 0.25
+            height: 0.25,
+            active: true // 🌟 Control interno de colisión activa
         };
 
         const rockEntity = {
@@ -44,23 +45,41 @@ const RockObject = (() => {
             collider: colliderRef,
             resourceType: 'stone',
             resourceAmount: 20,
-            health: 100,
+            isReady: true,       // Estado visible y recolectable
+            respawnTimer: 0,     // Temporizador de reaparición
 
             // Método update requerido por el bucle del ecosistema
             update(delta, scene, obstaclesList, allObjectsList) {
-                // Las rocas no crecen ni se mueven de forma autónoma por defecto
+                if (!this.isReady) {
+                    this.respawnTimer -= delta;
+                    if (this.respawnTimer <= 0) {
+                        this.respawn();
+                    }
+                }
             },
 
             // Método de minado / recolección
             mine() {
-                if (this.health <= 0) return 0;
-                this.health = 0;
+                if (!this.isReady) return 0;
                 
-                // Ocultar o reducir malla al ser minada por completo
-                group.scale.set(0.1, 0.1, 0.1);
-                this.collider.radius = 0.04;
+                this.isReady = false;
+                this.respawnTimer = 60.0; // 🌟 1 minuto exacto para reponerse
+                
+                // Ocultar malla y desactivar colisión
+                group.visible = false;
+                this.collider.active = false;
                 
                 return this.resourceAmount;
+            },
+
+            // Método de reaparición
+            respawn() {
+                this.isReady = true;
+                this.respawnTimer = 0;
+                
+                // Mostrar malla y reactivar colisión
+                group.visible = true;
+                this.collider.active = true;
             }
         };
 
