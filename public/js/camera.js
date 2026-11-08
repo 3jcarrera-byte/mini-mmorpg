@@ -50,7 +50,7 @@ const CameraModule = (() => {
             const rtsBack = 2.5;   
             
             // Limitamos para que no baje tanto (primer valor en -0.3 o -0.2 para que se detenga a la altura del personaje)
-            const rtsPitch = Math.max(-1.1, Math.min(0.6, player.pitch));
+            const rtsPitch = Math.max(-0.8, Math.min(0.1, player.pitch));
 
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(rtsHeight))
