@@ -8,7 +8,7 @@ const WorldModule = (() => {
     const obstacles = []; 
     const interactiveObjects = []; 
 
-    function createPlanet(scene, planetTypeKey = "TEMPERATE_FOREST", orbitRadius = 0) {
+    function createPlanet(scene, planetTypeKey = "TEMPERATE_FOREST", orbitRadius = 0, customRadius = null) {
         // Limpiar recursos previos antes de generar uno nuevo
         destroyWorld(scene);
 
@@ -20,8 +20,10 @@ const WorldModule = (() => {
         // Cargar configuración desde PLANET_TYPES
         const config = window.PLANET_TYPES[planetTypeKey] || window.PLANET_TYPES.TEMPERATE_FOREST;
         
-        // Si el radio es un rango, tomamos el valor medio o el primero, de lo contrario usamos config.radius o 5
-        if (Array.isArray(config.radiusRange)) {
+        // Sincronizar el radio exacto recibido del registro de la galaxia o calcularlo por defecto
+        if (customRadius !== null) {
+            currentRadius = customRadius;
+        } else if (Array.isArray(config.radiusRange)) {
             currentRadius = (config.radiusRange[0] + config.radiusRange[1]) / 2;
         } else {
             currentRadius = config.radius || 5;
@@ -38,11 +40,10 @@ const WorldModule = (() => {
 
         planetMesh = new THREE.Mesh(planetGeo, planetMat);
         
-        // Posicionar el planeta a la distancia orbital asignada respecto al Sol (0,0,0)
+        // Posicionar el planeta en su órbita local respecto al centro estelar
         planetMesh.position.set(orbitRadius, 0, 0);
         scene.add(planetMesh);
 
-        // El generador de mundos orquesta internamente la creación de capas y elementos
         if (config.hasOcean !== false) {
             createOceanLayer(config);
         }
@@ -110,13 +111,10 @@ const WorldModule = (() => {
         });
 
         oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
-        // El océano es hijo directo del planeta para acompañarlo en su rotación
         planetMesh.add(oceanMesh);
     }
 
     function createAtmosphereLayer(config) {
-        // CORRECCIÓN VISUAL: Usar FrontSide con un radio cercano y depthWrite: false 
-        // para que actúe como un halo atmosférico exterior limpio sin esferas negras o fantasmas internos.
         const atmosphereRadius = currentRadius * 1.08; 
         const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
         
@@ -131,7 +129,6 @@ const WorldModule = (() => {
         });
 
         atmosphereMesh = new THREE.Mesh(atmosphereGeo, atmosphereMat);
-        // La atmósfera es hija del planeta para rotar y acompañarlo en su órbita
         planetMesh.add(atmosphereMesh);
     }
 
@@ -140,7 +137,6 @@ const WorldModule = (() => {
         let trees = 40;
         let rocks = 20;
 
-        // Soporte dual para la estructura nueva de recursos de worldsConfig o conteos directos
         if (Array.isArray(resourcesOrTrees)) {
             resourcesOrTrees.forEach(res => {
                 if (res.type === 'tree' || res.type === 'frozen_tree') trees = res.density || 40;
@@ -213,6 +209,7 @@ const WorldModule = (() => {
         destroyWorld,
         rotatePlanet,
         updateEcosystem,
+        getPlanetMesh: () => planetMesh, // REQUISITO CLAVE PARA LAS FÍSICAS DE GAME.JS
         getRadius: () => currentRadius,
         getObstacles: () => obstacles,
         getInteractiveObjects: () => interactiveObjects,
