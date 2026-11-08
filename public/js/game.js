@@ -4,9 +4,8 @@ const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
         mesh: null, 
-        baseSpeed: 0.03,
-        speed: 0.03, 
-        jumpSpeed: 0.04,    
+        speed: 0.035, // Velocidad de zancada optimizada
+        jumpSpeed: 0.045,    
         verticalVelocity: 0, 
         altitude: 0,      
         name: 'Héroe', 
@@ -73,8 +72,8 @@ const Game = {
         if (!canvas) return;
 
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x050510);
-        this.scene.fog = new THREE.FogExp2(0x050510, 0.03);
+        this.scene.background = new THREE.Color(0x020208);
+        this.scene.fog = new THREE.FogExp2(0x020208, 0.015);
 
         this.camera = new THREE.PerspectiveCamera(65, 800 / 600, 0.1, 1000);
 
@@ -97,12 +96,10 @@ const Game = {
                 this.currentPlanetKey = targetPlanetData.planetTypeKey || targetPlanetData.type || 'TEMPERATE_FOREST';
                 this.planetRadius = targetPlanetData.radius || 5.0;
 
-                // Asignar gravedad y propiedades físicas coherentes según el arquetipo del planeta
                 const archetype = GalaxyModule.PLANET_ARCHETYPES[this.currentPlanetKey];
                 if (archetype && archetype.gravity) {
-                    // Escalar gravedad del motor en función de la gravedad del planeta (referencia base 9.8)
-                    this.gravity = (archetype.gravity / 9.8) * 0.0038;
-                    this.localPlayer.jumpSpeed = Math.sqrt(this.gravity * 0.4); // Impulsor de salto coherente
+                    this.gravity = (archetype.gravity / 9.8) * 0.0035;
+                    this.localPlayer.jumpSpeed = Math.sqrt(this.gravity * 0.5);
                 }
 
                 activePlanetMesh = GalaxyModule.loadPlanetScene(this.scene, activePlanetId);
@@ -406,12 +403,11 @@ const Game = {
 
             const R = this.planetRadius;
             
-            // Obtener el centro móvil real del planeta actual en el espacio 3D de la galaxia
             const planetMesh = (typeof WorldModule !== 'undefined' && typeof WorldModule.getPlanetMesh === 'function') ? WorldModule.getPlanetMesh() : null;
             const planetGlobalCenter = new THREE.Vector3();
             if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
 
-            // 🌟 Sincronización rotacional perfecta: Rotar la posición y orientación del jugador junto con el giro del planeta
+            // Sincronización rotacional fluida alrededor del centro del planeta activo
             const planetRotationStep = 0.001;
             p.position.sub(planetGlobalCenter);
             p.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
@@ -466,7 +462,6 @@ const Game = {
                 tempForward.applyAxisAngle(axis, angle);
             }
 
-            // Normalización respetando el centro móvil del planeta flotante actual
             targetPos.sub(planetGlobalCenter).normalize().multiplyScalar(R + p.altitude).add(planetGlobalCenter);
 
             if (!this.checkCollision(targetPos, p.altitude)) {
