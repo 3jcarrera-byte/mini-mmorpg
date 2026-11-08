@@ -4,7 +4,7 @@ const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
         mesh: null, 
-        speed: 0.032, // Velocidad constante y controlada
+        speed: 0.032, 
         jumpSpeed: 0.045,    
         verticalVelocity: 0, 
         altitude: 0,      
@@ -406,11 +406,14 @@ const Game = {
 
             let normal = p.position.clone().sub(planetGlobalCenter).normalize();
 
-            // Obtener dirección de la cámara y proyectarla sobre el plano tangente del planeta
-            const camDir = new THREE.Vector3();
-            this.camera.getWorldDirection(camDir);
-            const forwardTangent = camDir.clone().sub(normal.clone().multiplyScalar(camDir.dot(normal))).normalize();
-            const rightTangent = new THREE.Vector3().crossVectors(forwardTangent, normal).normalize();
+            // Construir base tangente estable basada en la normal y yawOffset
+            const refVector = Math.abs(normal.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+            const tangentRight = new THREE.Vector3().crossVectors(normal, refVector).normalize();
+            const tangentForward = new THREE.Vector3().crossVectors(tangentRight, normal).normalize();
+
+            const rotMatrixYaw = new THREE.Matrix4().makeRotationAxis(normal, p.yawOffset);
+            const viewForward = tangentForward.clone().applyMatrix4(rotMatrixYaw).normalize();
+            const viewRight = tangentRight.clone().applyMatrix4(rotMatrixYaw).normalize();
 
             let moveForward = 0;
             let moveSide = 0;
@@ -439,10 +442,10 @@ const Game = {
             }
 
             const targetPos = p.position.clone();
-            let travelDirection = forwardTangent.clone();
 
-            if (moveForward !== 0 || moveSide !== 0) {
-                const moveDir = forwardTangent.clone().multiplyScalar(moveForward).add(rightTangent.clone().multiplyScalar(moveSide)).normalize();
+            if (isMoving) {
+                // Dirección de movimiento calculada en base a la vista de la cámara
+                const moveDir = viewForward.clone().multiplyScalar(moveForward).add(viewRight.clone().multiplyScalar(moveSide)).normalize();
                 
                 const axis = new THREE.Vector3().crossVectors(normal, moveDir).normalize();
                 const angle = p.speed / R;
@@ -451,7 +454,8 @@ const Game = {
                 targetPos.applyAxisAngle(axis, angle);
                 targetPos.add(planetGlobalCenter);
 
-                travelDirection = moveDir;
+                // El personaje mira exactamente hacia donde camina
+                p.forward.copy(moveDir);
             }
 
             targetPos.sub(planetGlobalCenter).normalize().multiplyScalar(R + p.altitude).add(planetGlobalCenter);
@@ -461,10 +465,9 @@ const Game = {
             }
 
             normal = p.position.clone().sub(planetGlobalCenter).normalize();
-            p.forward.copy(travelDirection);
             p.mesh.position.copy(p.position);
 
-            // Orientar el avatar alineado perfectamente con la superficie esférica
+            // Orientación estable y limpia del avatar sin giros espurios en su propio eje
             const currentRight = new THREE.Vector3().crossVectors(p.forward, normal).normalize();
             const orthogonalForward = new THREE.Vector3().crossVectors(normal, currentRight).normalize();
             const rotMatrix = new THREE.Matrix4().makeBasis(currentRight, normal, orthogonalForward.clone().negate());
@@ -472,7 +475,7 @@ const Game = {
             
             p.mesh.visible = (this.cameraMode !== 'first');
 
-            if ((moveForward !== 0 || moveSide !== 0 || p.altitude > 0) && this.socket) {
+            if (isMoving && this.socket) {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
