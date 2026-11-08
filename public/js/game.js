@@ -1,12 +1,11 @@
-// Bucle principal del juego y control del cliente (game.js)
 const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
         mesh: null, 
         speed: 0.03, 
-        jumpSpeed: 0.04,    
+        jumpSpeed: 0.04,   
         verticalVelocity: 0, 
-        altitude: 0,       
+        altitude: 0,      
         name: 'Héroe', 
         level: 1, 
         classType: 'guerrero', 
@@ -19,16 +18,16 @@ const Game = {
         radius: 0.08 
     },
     remotePlayers: {},
-    keys: {},
     isGameRunning: false,
     planetRadius: 5.0,
     gravity: 0.004,
-    cameraMode: 'third', // 'first', 'third', 'rts'
+    cameraMode: 'third', // 'first' (1), 'third' (2), 'rts' (3)
     isAiming: false,
-     
-    crosshairOffset: { x: 0, y: 0 },
-    maxCrosshairRadius: 40,
     lastFrameTime: 0,
+
+    setCameraMode(mode) {
+        this.cameraMode = mode;
+    },
 
     start(characterData) {
         if (characterData) {
@@ -98,73 +97,22 @@ const Game = {
             InventoryModule.init();
         }
 
-        window.addEventListener('keydown', e => {
-            this.keys[e.code] = true;
+        // Inicializar el módulo externo de controles
+        if (typeof InputModule !== 'undefined') {
+            InputModule.init(canvas);
+        }
+    },
 
-            const invModal = document.getElementById('inventory-modal');
-            if (invModal && invModal.style.display === 'block') {
-                if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
-                    invModal.style.display = 'none';
-                    if (canvas && typeof canvas.requestPointerLock === 'function') {
-                        canvas.requestPointerLock();
-                    }
-                }
-            }
-
-            if (e.code === 'KeyV') {
-                if (this.cameraMode === 'first') {
-                    this.cameraMode = 'third';
-                } else if (this.cameraMode === 'third') {
-                    this.cameraMode = 'rts';
-                } else {
-                    this.cameraMode = 'first';
-                }
-                this.crosshairOffset.x = 0;
-                this.crosshairOffset.y = 0;
-            }
-        });
-
-        window.addEventListener('keyup', e => this.keys[e.code] = false);
-
-        canvas.addEventListener('contextmenu', e => e.preventDefault());
+    handleMouseMove(e) {
+        const sensitivity = 0.003;
+        const normal = this.localPlayer.position.clone().normalize();
         
-        canvas.addEventListener('click', () => {
-            const invModal = document.getElementById('inventory-modal');
-            if (!invModal || invModal.style.display !== 'block') {
-                canvas.requestPointerLock();
-            }
-        });
+        const yawDelta = -e.movementX * sensitivity;
+        this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
+        this.localPlayer.forward.normalize();
 
-        canvas.addEventListener('mousedown', e => {
-            if (e.button === 2) { 
-                this.isAiming = true;
-            } else {
-                this.handleBuildClick(e);
-            }
-        });
-
-        canvas.addEventListener('mouseup', e => {
-            if (e.button === 2) {
-                this.isAiming = false;
-            }
-        });
-
-        document.addEventListener('mousemove', e => {
-            if (document.pointerLockElement === canvas) {
-                const sensitivity = 0.003;
-                const normal = this.localPlayer.position.clone().normalize();
-                
-                const yawDelta = -e.movementX * sensitivity;
-                this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
-                this.localPlayer.forward.normalize();
-
-                this.localPlayer.pitch -= e.movementY * sensitivity;
-                this.localPlayer.pitch = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, this.localPlayer.pitch));
-
-                this.crosshairOffset.x = 0;
-                this.crosshairOffset.y = 0;
-            }
-        });
+        this.localPlayer.pitch -= e.movementY * sensitivity;
+        this.localPlayer.pitch = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, this.localPlayer.pitch));
     },
 
     createShooterCrosshair() {
@@ -373,12 +321,12 @@ const Game = {
             let moveForward = 0;
             let moveSide = 0;
 
-            if (this.keys['KeyW'] || this.keys['ArrowUp']) { moveForward += p.speed; isMoving = true; }
-            if (this.keys['KeyS'] || this.keys['ArrowDown']) { moveForward -= p.speed; isMoving = true; }
-            if (this.keys['KeyA'] || this.keys['ArrowLeft']) { moveSide -= p.speed; isMoving = true; }
-            if (this.keys['KeyD'] || this.keys['ArrowRight']) { moveSide += p.speed; isMoving = true; }
+            if (InputModule.isDown('KeyW') || InputModule.isDown('ArrowUp')) { moveForward += p.speed; isMoving = true; }
+            if (InputModule.isDown('KeyS') || InputModule.isDown('ArrowDown')) { moveForward -= p.speed; isMoving = true; }
+            if (InputModule.isDown('KeyA') || InputModule.isDown('ArrowLeft')) { moveSide -= p.speed; isMoving = true; }
+            if (InputModule.isDown('KeyD') || InputModule.isDown('ArrowRight')) { moveSide += p.speed; isMoving = true; }
 
-            if (this.keys['Space'] && p.altitude <= 0.001) {
+            if (InputModule.isDown('Space') && p.altitude <= 0.001) {
                 p.verticalVelocity = p.jumpSpeed;
             }
 
@@ -434,59 +382,9 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS ---
-            this.camera.up.copy(normal);
-
-            if (this.cameraMode === 'first') {
-                const eyeHeight = 0.38;
-                const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
-                this.camera.position.copy(eyePosition);
-
-                const lookDir = p.forward.clone();
-                lookDir.applyAxisAngle(right, p.pitch);
-                const targetLookAt = eyePosition.clone().add(lookDir.multiplyScalar(p.weaponRange));
-                this.camera.lookAt(targetLookAt);
-
-            } else if (this.cameraMode === 'third') {
-                const baseDistance = 1.6;
-                const baseHeight = 0.6;
-                const pitchOffset = Math.sin(p.pitch) * 0.25;
-
-                let camPos = p.position.clone()
-                    .add(normal.clone().multiplyScalar(baseHeight + pitchOffset))
-                    .add(right.clone().multiplyScalar(p.yawOffset));
-
-                const camNormal = camPos.clone().normalize();
-                if (camPos.length() < R + 0.3) {
-                    camPos.copy(camNormal.multiplyScalar(R + 0.3));
-                }
-
-                this.camera.position.copy(camPos);
-                const lookTarget = p.position.clone().add(normal.clone().multiplyScalar(0.3)).add(p.forward.clone().multiplyScalar(2.0));
-                this.camera.lookAt(lookTarget);
-
-            } else if (this.cameraMode === 'rts') {
-                const rtsHeight = 3.0; 
-                const rtsBack = 1.8;   
-                
-                // 🌟 Límite inferior extendido hasta los pies (coincidiendo con tu línea roja) y superior reducido a la mitad
-                const rtsPitch = Math.max(-0.55, Math.min(0.08, p.pitch));
-
-                let camPos = p.position.clone()
-                    .add(normal.clone().multiplyScalar(rtsHeight))
-                    .sub(p.forward.clone().multiplyScalar(rtsBack));
-
-                const camNormal = camPos.clone().normalize();
-                if (camPos.length() < R + 0.3) {
-                    camPos.copy(camNormal.multiplyScalar(R + 0.3));
-                }
-
-                this.camera.position.copy(camPos);
-                
-                const lookDir = p.forward.clone();
-                lookDir.applyAxisAngle(right, rtsPitch);
-                const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.02)).add(lookDir.multiplyScalar(p.weaponRange));
-                this.camera.lookAt(targetLookAt);
+            // Delegar actualización de la cámara al módulo especializado
+            if (typeof CameraModule !== 'undefined') {
+                CameraModule.updateCamera(this.camera, p, this.cameraMode, R);
             }
         }
 
