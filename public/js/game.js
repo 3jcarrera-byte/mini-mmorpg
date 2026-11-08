@@ -1,4 +1,5 @@
-// Bucle principal del juego y control del cliente (game.js)
+// public/js/game.js
+
 const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
@@ -8,8 +9,8 @@ const Game = {
         verticalVelocity: 0, 
         altitude: 0,      
         name: 'Héroe', 
-        level: 1, 
-        classType: 'guerrero', 
+        level: 0, // Nivel inicial 0
+        alienRace: 'reptilian', // Reemplazado de clase a raza alienígena
         color: 0xff0033,
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
@@ -34,12 +35,19 @@ const Game = {
     start(characterData) {
         if (characterData) {
             this.localPlayer.name = characterData.name || 'Héroe';
-            this.localPlayer.level = characterData.level || 1;
-            this.localPlayer.classType = characterData.classType || 'guerrero';
+            this.localPlayer.level = characterData.level !== undefined ? characterData.level : 0; // Garantizar nivel 0 por defecto
+            this.localPlayer.alienRace = characterData.alienRace || characterData.classType || 'reptilian';
              
-            if (characterData.classType === 'mago') this.localPlayer.color = 0x0088ff;
-            else if (characterData.classType === 'arquero') this.localPlayer.color = 0x00ff66;
-            else this.localPlayer.color = 0xff0033;
+            // Definir colores y propiedades visuales según raza alienígena
+            if (this.localPlayer.alienRace === 'cyborg' || this.localPlayer.alienRace === 'mago') {
+                this.localPlayer.color = 0x0088ff;
+            } else if (this.localPlayer.alienRace === 'insectoid' || this.localPlayer.alienRace === 'arquero') {
+                this.localPlayer.color = 0x00ff66;
+            } else if (this.localPlayer.alienRace === 'tentacled') {
+                this.localPlayer.color = 0xaa00ff;
+            } else {
+                this.localPlayer.color = 0xff0033; // reptilian / default
+            }
         }
 
         if (typeof App !== 'undefined' && typeof App.changeScreen === 'function') {
@@ -75,45 +83,55 @@ const Game = {
 
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-        // 🌟 CORRECCIÓN 2: Inicializar el Sol en el origen absoluto (0,0,0) mediante su módulo
+        // Inicializar el Sol en el origen absoluto (0,0,0) mediante su módulo masivo
         if (typeof SunModule !== 'undefined') {
             SunModule.create(this.scene);
         }
 
-        // 🌟 CORRECCIÓN 1: Leer dinámicamente desde worldsConfig.js (PLANET_TYPES y STAR_SYSTEMS)
-        let selectedType = 'TEMPERATE_FOREST';
-        let orbitalDistance = 0;
-
-        if (typeof STAR_SYSTEMS !== 'undefined' && STAR_SYSTEMS.length > 0) {
-            const defaultSystem = STAR_SYSTEMS[0];
-            if (defaultSystem.planets && defaultSystem.planets.length > 0) {
-                selectedType = defaultSystem.planets[0].type;
-                orbitalDistance = defaultSystem.planets[0].orbitRadius || 0;
+        // Cargar dinámicamente el planeta activo desde GalaxyModule (Generación por Demanda)
+        let activePlanetMesh = null;
+        if (typeof GalaxyModule !== 'undefined') {
+            const activePlanetId = GalaxyModule.getActivePlanetId() || 1;
+            const registry = GalaxyModule.getGalaxyRegistry();
+            const targetPlanetData = registry.find(p => p.id === activePlanetId);
+            
+            if (targetPlanetData) {
+                this.currentPlanetKey = targetPlanetData.type;
+                activePlanetMesh = GalaxyModule.loadPlanetScene(this.scene, targetPlanetId);
             }
         }
 
-        this.currentPlanetKey = selectedType;
-
-        if (typeof WorldModule !== 'undefined' && typeof WorldModule.createPlanet === 'function') {
-            WorldModule.createPlanet(this.scene, selectedType, orbitalDistance);
+        // Fallback si GalaxyModule no está inicializado aún
+        if (!activePlanetMesh && typeof WorldModule !== 'undefined' && typeof WorldModule.createPlanet === 'function') {
+            activePlanetMesh = WorldModule.createPlanet(this.scene, 'TEMPERATE_FOREST', 0);
         }
 
         if (typeof WorldModule.getRadius === 'function') {
             this.planetRadius = WorldModule.getRadius();
         }
 
-        this.localPlayer.position.set(orbitalDistance, this.planetRadius, 0);
+        // Sincronizar spawn exacto del jugador sobre el planeta activo flotando en el espacio profundo
+        if (activePlanetMesh) {
+            const planetGlobalCenter = new THREE.Vector3();
+            activePlanetMesh.getWorldPosition(planetGlobalCenter);
+            
+            // Colocar al jugador exactamente sobre la superficie del planeta flotante
+            this.localPlayer.position.set(planetGlobalCenter.x, planetGlobalCenter.y + this.planetRadius, planetGlobalCenter.z);
+        } else {
+            this.localPlayer.position.set(0, this.planetRadius, 0);
+        }
+
         this.localPlayer.forward.set(0, 0, -1).normalize();
         this.localPlayer.pitch = 0;
         this.localPlayer.yawOffset = 0.22;
         this.localPlayer.altitude = 0;
         this.localPlayer.verticalVelocity = 0;
 
-        this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
+        this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.alienRace, this.localPlayer.color);
         this.scene.add(this.localPlayer.mesh);
 
         const hudName = document.getElementById('hud-char-name');
-        if (hudName) hudName.innerText = `${this.localPlayer.name} (Lv.${this.localPlayer.level})`;
+        if (hudName) hudName.innerText = `${this.localPlayer.name} [${this.localPlayer.alienRace.toUpperCase()}] (Lv.${this.localPlayer.level})`;
 
         this.createShooterCrosshair();
 
@@ -136,7 +154,12 @@ const Game = {
 
     handleMouseMove(e) {
         const sensitivity = 0.003;
-        const normal = this.localPlayer.position.clone().normalize();
+        const planetMesh = (typeof WorldModule !== 'undefined' && typeof WorldModule.getPlanetMesh === 'function') ? WorldModule.getPlanetMesh() : null;
+        const planetGlobalCenter = new THREE.Vector3();
+        if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
+
+        // Gravedad local relativa al centro móvil del planeta actual
+        const normal = this.localPlayer.position.clone().sub(planetGlobalCenter).normalize();
         
         const yawDelta = -e.movementX * sensitivity;
         this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
@@ -193,7 +216,7 @@ const Game = {
         }
     },
 
-    createPlayerAvatar(classType, customColor) {
+    createPlayerAvatar(alienRace, customColor) {
         const group = new THREE.Group();
         
         const body = new THREE.Mesh(
@@ -286,7 +309,6 @@ const Game = {
                 return;
             }
 
-            // Obtener índice o identificador único de la entidad para sincronización multijugador
             const entityIndex = interactiveObjects.indexOf(targetEntity);
 
             if (typeof targetEntity.chopDown === 'function' && targetEntity.state !== 'stump') {
@@ -297,7 +319,6 @@ const Game = {
                     InventoryModule.addItem('wood', amount);
                 }
 
-                // 🌟 CORRECCIÓN 3: Sincronizar recolección con el servidor para evitar desincronización multijugador
                 if (this.socket) {
                     this.socket.emit('gatherResource', { 
                         type: 'wood', 
@@ -313,7 +334,6 @@ const Game = {
                     InventoryModule.addItem('stone', gainedStone);
                 }
 
-                // 🌟 CORRECCIÓN 3: Sincronizar minería con el servidor
                 if (this.socket) {
                     this.socket.emit('gatherResource', { 
                         type: 'stone', 
@@ -387,7 +407,12 @@ const Game = {
             p.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
             p.forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
 
-            let normal = p.position.clone().normalize();
+            // Obtener el centro móvil real del planeta actual en el espacio 3D de la galaxia
+            const planetMesh = (typeof WorldModule !== 'undefined' && typeof WorldModule.getPlanetMesh === 'function') ? WorldModule.getPlanetMesh() : null;
+            const planetGlobalCenter = new THREE.Vector3();
+            if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
+
+            let normal = p.position.clone().sub(planetGlobalCenter).normalize();
 
             p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
             const right = new THREE.Vector3().crossVectors(p.forward, normal).normalize();
@@ -435,14 +460,15 @@ const Game = {
                 tempForward.applyAxisAngle(axis, angle);
             }
 
-            targetPos.normalize().multiplyScalar(R + p.altitude);
+            // Normalización respetando el centro móvil del planeta flotante
+            targetPos.sub(planetGlobalCenter).normalize().multiplyScalar(R + p.altitude).add(planetGlobalCenter);
 
             if (!this.checkCollision(targetPos, p.altitude)) {
                 p.position.copy(targetPos);
                 p.forward.copy(tempForward);
             }
 
-            normal = p.position.clone().normalize();
+            normal = p.position.clone().sub(planetGlobalCenter).normalize();
             p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
 
             p.mesh.position.copy(p.position);
