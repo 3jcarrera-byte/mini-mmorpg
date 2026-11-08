@@ -115,7 +115,7 @@ const WorldModule = (() => {
     }
 
     function createAtmosphereLayer(config) {
-        const atmosphereRadius = currentRadius * 1.08; 
+        const atmosphereRadius = currentRadius * 2.5; // altura de la atmosfera
         const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
         
         const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.45;
