@@ -1,4 +1,4 @@
-// Módulo de Inventario con Stacks de 100, División con tecla C y Drag & Drop (inventory.js)
+// Módulo de Inventario con Stacks de 100, División con tecla C, Drag & Drop y Reactivación de Puntero (inventory.js)
 const InventoryModule = (() => {
     const maxSlots = 20;
     const maxStackSize = 100;
@@ -8,7 +8,7 @@ const InventoryModule = (() => {
     items[1] = { id: 2, type: 'stone', name: 'Piedra', count: 25, icon: '🪨', color: '#95a5a6' };
 
     let draggedIndex = null;
-    let hoveredSlotIndex = null; // 🌟 Rrastrea sobre qué ranura está el cursor para la tecla C
+    let hoveredSlotIndex = null;
 
     function init() {
         createUI();
@@ -87,19 +87,22 @@ const InventoryModule = (() => {
             toggle();
         };
 
-        // Escuchar teclas globales (B, C para dividir y movimiento W,A,S,D para cerrar)
         window.addEventListener('keydown', (e) => {
             const modalIsOpen = modal.style.display === 'block';
 
             if (e.code === 'KeyB') {
                 toggle();
             } else if (modalIsOpen && e.code === 'KeyC') {
-                // 🌟 Presionar C sobre la ranura activa abre el menú de división
                 if (hoveredSlotIndex !== null && items[hoveredSlotIndex] && items[hoveredSlotIndex].count > 1) {
                     openSplitModal(hoveredSlotIndex, items[hoveredSlotIndex]);
                 }
             } else if (modalIsOpen && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
                 modal.style.display = 'none';
+                // 🌟 Reactivar el puntero al cerrar por movimiento
+                const canvas = document.getElementById('mapCanvas');
+                if (canvas && !document.pointerLockElement) {
+                    canvas.requestPointerLock();
+                }
             }
         });
 
@@ -129,7 +132,6 @@ const InventoryModule = (() => {
 
             slot.setAttribute('data-index', i);
 
-            // 🌟 Control de qué ranura tiene el cursor encima
             slot.addEventListener('mouseenter', () => { hoveredSlotIndex = i; });
             slot.addEventListener('mouseleave', () => { if (hoveredSlotIndex === i) hoveredSlotIndex = null; });
 
@@ -353,6 +355,11 @@ const InventoryModule = (() => {
         
         if (isOpen) {
             modal.style.display = 'none';
+            // 🌟 Reactivar automáticamente el bloqueo del puntero al cerrar el inventario
+            const canvas = document.getElementById('mapCanvas');
+            if (canvas && !document.pointerLockElement) {
+                canvas.requestPointerLock();
+            }
         } else {
             if (document.pointerLockElement) {
                 document.exitPointerLock();
