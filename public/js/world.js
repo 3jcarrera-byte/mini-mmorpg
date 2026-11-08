@@ -26,178 +26,6 @@ const WorldModule = (() => {
         return planetMesh;
     }
 
-    // --- DISEÑO DETALLADO Y DINÁMICO DE ÁRBOLES (CRECIMIENTO RÁPIDO DE 15s PARA PRUEBAS) ---
-    function createDetailedTree(position, initialState = 'sapling', initialProgress = 0.2) {
-        const group = new THREE.Group();
-        
-        // Tronco
-        const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.45, 6);
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9, flatShading: true });
-        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-        trunk.position.y = 0.22;
-        group.add(trunk);
-
-        // Copas en capas (estilo pino estilizado)
-        const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d8a39, roughness: 0.7, flatShading: true });
-        
-        const layer1 = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.45, 5), leavesMat);
-        layer1.position.y = 0.45;
-        group.add(layer1);
-
-        const layer2 = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.35, 5), leavesMat);
-        layer2.position.y = 0.7;
-        group.add(layer2);
-
-        const layer3 = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.25, 5), leavesMat);
-        layer3.position.y = 0.9;
-        group.add(layer3);
-
-        group.position.copy(position);
-        group.lookAt(0, 0, 0);
-        group.rotateX(Math.PI / 2);
-        group.position.addScaledVector(group.position.clone().normalize(), 0.05);
-
-        const colliderRef = {
-            position: group.position.clone(),
-            radius: 0.18,
-            height: 0.6
-        };
-
-        const treeEntity = {
-            mesh: group,
-            collider: colliderRef,
-            resourceType: 'wood',
-            resourceAmount: 15,
-            
-            state: initialState, // 'sapling', 'adult', 'stump'
-            growthProgress: initialProgress,
-            health: 100,
-            regrowthTimer: 0,
-            seedTimer: 0,
-
-            update(delta, scene, obstaclesList, allObjectsList) {
-                // 1. Crecimiento rápido de brote a adulto en 15 segundos (ideal para pruebas)
-                if (this.state === 'sapling') {
-                    this.growthProgress += delta / 15.0; 
-                    if (this.growthProgress >= 1.0) {
-                        this.growthProgress = 1.0;
-                        this.state = 'adult';
-                        group.scale.set(1, 1, 1);
-                    } else {
-                        group.scale.setScalar(Math.max(0.2, this.growthProgress));
-                    }
-                    return;
-                }
-
-                // 2. Generación de semillas periódicas en árboles adultos (cada ~15s)
-                if (this.state === 'adult') {
-                    this.seedTimer += delta;
-                    if (this.seedTimer > 15) { 
-                        this.seedTimer = 0;
-                        this.trySpawnSeed(scene, obstaclesList, allObjectsList);
-                    }
-                }
-
-                // 3. Sistema de retoño del tocón (retoña en 15 segundos si no se extrae)
-                if (this.state === 'stump') {
-                    this.regrowthTimer += delta;
-                    if (this.regrowthTimer > 15) { 
-                        this.regrowthTimer = 0;
-                        this.state = 'sapling';
-                        this.growthProgress = 0.2;
-                        this.health = 100;
-                        group.scale.setScalar(0.2);
-                        
-                        this.collider.radius = 0.18;
-                        this.collider.height = 0.6;
-                    }
-                }
-            },
-
-            chopDown() {
-                if (this.state !== 'adult') return;
-
-                this.state = 'stump';
-                this.health = 0;
-                this.regrowthTimer = 0;
-
-                group.scale.set(1, 0.25, 1);
-                this.collider.radius = 0.08;
-                this.collider.height = 0.15;
-            },
-
-            trySpawnSeed(scene, obstaclesList, allObjectsList) {
-                let newPos = null;
-                let validPositionFound = false;
-
-                for (let attempt = 0; attempt < 5; attempt++) {
-                    const offsetTheta = (Math.random() - 0.5) * 0.25;
-                    const offsetPhi = (Math.random() - 0.5) * 0.25;
-                    
-                    const testPos = group.position.clone().add(new THREE.Vector3(offsetTheta, 0, offsetPhi)).normalize().multiplyScalar(planetRadius);
-
-                    let tooClose = false;
-                    for (let i = 0; i < allObjectsList.length; i++) {
-                        if (allObjectsList[i].mesh && allObjectsList[i].mesh.position.distanceTo(testPos) < 0.5) {
-                            tooClose = true;
-                            break;
-                        }
-                    }
-
-                    if (!tooClose) {
-                        newPos = testPos;
-                        validPositionFound = true;
-                        break;
-                    }
-                }
-
-                if (validPositionFound && newPos) {
-                    const newTree = createDetailedTree(newPos, 'sapling', 0.2);
-                    newTree.mesh.scale.setScalar(0.2);
-
-                    scene.add(newTree.mesh);
-                    obstaclesList.push(newTree.collider);
-                    allObjectsList.push(newTree);
-                }
-            }
-        };
-
-        group.scale.setScalar(Math.max(0.2, initialProgress));
-        return treeEntity;
-    }
-
-    function createDetailedRock(position) {
-        const group = new THREE.Group();
-        const rockMat = new THREE.MeshStandardMaterial({ color: 0x7a7a7a, roughness: 0.85, flatShading: true });
-        
-        const mainGeo = new THREE.DodecahedronGeometry(0.22, 0);
-        const mainRock = new THREE.Mesh(mainGeo, rockMat);
-        mainRock.scale.set(1.2, 0.8, 1.0);
-        mainRock.position.y = 0.12;
-        group.add(mainRock);
-
-        const smallGeo = new THREE.DodecahedronGeometry(0.12, 0);
-        const smallRock = new THREE.Mesh(smallGeo, rockMat);
-        smallRock.position.set(0.15, 0.06, 0.1);
-        group.add(smallRock);
-
-        group.position.copy(position);
-        group.lookAt(0, 0, 0);
-        group.rotateX(Math.PI / 2);
-        group.position.addScaledVector(group.position.clone().normalize(), 0.04);
-
-        return {
-            mesh: group,
-            collider: {
-                position: group.position.clone(),
-                radius: 0.22,
-                height: 0.35
-            },
-            resourceType: 'stone',
-            resourceAmount: 20
-        };
-    }
-
     function generateFeatures(scene, trees, rocks) {
         const generatedPositions = [];
 
@@ -231,13 +59,24 @@ const WorldModule = (() => {
 
             const isTree = i < trees;
             let featureData;
+
             if (isTree) {
-                // Para probar al instante, generamos una mezcla donde algunos nacen como brotes con progreso aleatorio
                 const randomState = Math.random() < 0.6 ? 'sapling' : 'adult';
                 const randomProgress = randomState === 'sapling' ? Math.random() * 0.7 + 0.2 : 1.0;
-                featureData = createDetailedTree(position, randomState, randomProgress);
+                
+                // 🌟 USAR EL MÓDULO GLOBAL UNIFICADO DE ÁRBOLES
+                if (window.TreeObject && typeof window.TreeObject.create === 'function') {
+                    featureData = window.TreeObject.create(position, randomState, randomProgress);
+                } else {
+                    console.warn("window.TreeObject no está disponible. Asegúrate de cargar tree.js antes que world.js.");
+                }
             } else {
-                featureData = createDetailedRock(position);
+                // 🌟 USAR EL MÓDULO GLOBAL UNIFICADO DE ROCAS
+                if (window.RockObject && typeof window.RockObject.create === 'function') {
+                    featureData = window.RockObject.create(position);
+                } else {
+                    console.warn("window.RockObject no está disponible. Asegúrate de cargar rock.js antes que world.js.");
+                }
             }
 
             if (featureData) {
