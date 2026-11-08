@@ -28,7 +28,7 @@ const Game = {
     
     crosshairOffset: { x: 0, y: 0 },
     maxCrosshairRadius: 40,
-    lastFrameTime: 0, // Para el cálculo de delta en el ecosistema
+    lastFrameTime: 0, // Para el cálculo preciso de delta en el ecosistema
 
     start(characterData) {
         if (characterData) {
@@ -288,9 +288,9 @@ const Game = {
         if (!this.isGameRunning) return;
         requestAnimationFrame(() => this.loop());
 
-        // Calcular el delta de tiempo transcurrido en segundos
+        // Calcular el delta de tiempo transcurrido en segundos de forma limpia
         const now = performance.now();
-        const delta = (now - this.lastFrameTime) / 1000;
+        const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1); // Limitar delta para evitar saltos bruscos si la pestaña pierde foco
         this.lastFrameTime = now;
 
         // Actualizar el ecosistema del mundo (crecimiento de árboles, semillas, retoños)
