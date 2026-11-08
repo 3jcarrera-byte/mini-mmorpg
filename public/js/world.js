@@ -33,12 +33,13 @@ const WorldModule = (() => {
 
         createAtmosphereLayer(scene, worldConfig);
 
-        // Instanciar el Sol mediante su módulo independiente
+        // Generar recursos en la superficie (Árboles y Rocas)
+        generateFeatures(scene, planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
+
+        // Instanciar el Sol de forma independiente justo debajo de la generación del mundo
         if (typeof SunModule !== 'undefined') {
             SunModule.create(scene, { position: { x: 40, y: 25, z: 30 } });
         }
-
-        generateFeatures(scene, planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
         
         return planetMesh;
     }
@@ -87,7 +88,6 @@ const WorldModule = (() => {
         const atmosphereRadius = currentRadius * 5.0; 
         const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
         
-        // CORRECCIÓN: MeshBasicMaterial evita que la cúpula bloquee u oscurezca la luz del sol hacia el planeta
         const atmosphereMat = new THREE.MeshBasicMaterial({
             color: worldConfig.atmosphereColor || 0x5599ff,
             transparent: true,
