@@ -8,15 +8,21 @@ const WorldModule = (() => {
     const obstacles = []; 
     const interactiveObjects = []; 
 
-    function createPlanet(scene, worldConfig = {}) {
+    function createPlanet(scene, planetTypeKey = "TEMPERATE_FOREST", orbitRadius = 0) {
+        // Limpiar recursos previos antes de generar uno nuevo
+        destroyWorld(scene);
+
         obstacles.length = 0;
         interactiveObjects.length = 0;
 
         scene.background = new THREE.Color(0x020208);
-        currentRadius = worldConfig.radius || 5;
+
+        // Cargar configuración desde PLANET_TYPES
+        const config = window.PLANET_TYPES[planetTypeKey] || window.PLANET_TYPES.TEMPERATE_FOREST;
+        currentRadius = config.radius || 5;
 
         const planetGeo = new THREE.SphereGeometry(currentRadius, 32, 32);
-        applyProceduralBiomesAndElevation(planetGeo, currentRadius, worldConfig);
+        applyProceduralBiomesAndElevation(planetGeo, currentRadius, config);
 
         const planetMat = new THREE.MeshStandardMaterial({ 
             vertexColors: true, 
@@ -25,29 +31,47 @@ const WorldModule = (() => {
         });
 
         planetMesh = new THREE.Mesh(planetGeo, planetMat);
+        
+        // Posicionar el planeta a la distancia orbital asignada respecto al Sol (0,0,0)
+        planetMesh.position.set(orbitRadius, 0, 0);
         scene.add(planetMesh);
 
-        if (worldConfig.hasOcean !== false) {
-            createOceanLayer(scene, worldConfig);
+        if (config.hasOcean !== false) {
+            createOceanLayer(scene, config);
         }
 
-        createAtmosphereLayer(scene, worldConfig);
+        createAtmosphereLayer(scene, config);
 
-        // Generar recursos en la superficie (Árboles y Rocas)
-        generateFeatures(scene, planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
-
-        // Instanciar el Sol de forma independiente justo debajo de la generación del mundo
-        if (typeof SunModule !== 'undefined') {
-            SunModule.create(scene, { position: { x: 40, y: 25, z: 30 } });
-        }
+        generateFeatures(scene, planetMesh, config.treeCount || 40, config.rockCount || 20);
         
         return planetMesh;
     }
 
-    function applyProceduralBiomesAndElevation(geometry, baseRadius, worldConfig) {
+    function destroyWorld(scene) {
+        if (planetMesh) {
+            scene.remove(planetMesh);
+            planetMesh.geometry.dispose();
+            planetMesh.material.dispose();
+            planetMesh = null;
+        }
+        if (oceanMesh) {
+            scene.remove(oceanMesh);
+            oceanMesh.geometry.dispose();
+            oceanMesh.material.dispose();
+            oceanMesh = null;
+        }
+        if (atmosphereMesh) {
+            scene.remove(atmosphereMesh);
+            atmosphereMesh.geometry.dispose();
+            atmosphereMesh.material.dispose();
+            atmosphereMesh = null;
+        }
+    }
+
+    function applyProceduralBiomesAndElevation(geometry, baseRadius, config) {
         const positionAttribute = geometry.attributes.position;
         const colorAttribute = new THREE.BufferAttribute(new Float32Array(positionAttribute.count * 3), 3);
-        const colors = worldConfig.colors || { low: 0x2e5a1e, mid: 0x4a7c36, high: 0x8a8a8a, peak: 0xffffff };
+        const colors = config.colors || { low: 0x2e5a1e, mid: 0x4a7c36, high: 0x8a8a8a, peak: 0xffffff };
         const vertex = new THREE.Vector3();
         const color = new THREE.Color();
 
@@ -65,13 +89,13 @@ const WorldModule = (() => {
         geometry.setAttribute('color', colorAttribute);
     }
 
-    function createOceanLayer(scene, worldConfig) {
-        const oceanRadius = currentRadius * (worldConfig.oceanLevel || 0.96);
+    function createOceanLayer(scene, config) {
+        const oceanRadius = currentRadius * (config.oceanLevel || 0.96);
         const oceanGeo = new THREE.SphereGeometry(oceanRadius, 32, 32);
-        const isMagma = worldConfig.oceanColor === 0x3b0000 || worldConfig.name?.includes("Volcánico");
+        const isMagma = config.oceanColor === 0x3b0000 || config.name?.includes("Volcánico");
 
         const oceanMat = new THREE.MeshStandardMaterial({
-            color: worldConfig.oceanColor || 0x1e90ff,
+            color: config.oceanColor || 0x1e90ff,
             roughness: isMagma ? 0.2 : 0.1,
             metalness: isMagma ? 0.8 : 0.1,
             emissive: isMagma ? 0xff3300 : 0x000000,
@@ -81,22 +105,27 @@ const WorldModule = (() => {
         });
 
         oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
-        scene.add(oceanMesh);
+        // El océano sigue la posición del planeta
+        planetMesh.add(oceanMesh);
     }
 
-    function createAtmosphereLayer(scene, worldConfig) {
-        const atmosphereRadius = currentRadius * 5.0; 
+    function createAtmosphereLayer(scene, config) {
+        // Capa de ozono rasante y cercana a la superficie (radio ligeramente superior)
+        const atmosphereRadius = currentRadius * 1.05; 
         const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
         
+        const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.45;
+
         const atmosphereMat = new THREE.MeshBasicMaterial({
-            color: worldConfig.atmosphereColor || 0x5599ff,
+            color: config.atmosphereColor || 0x5599ff,
             transparent: true,
-            opacity: 0.45,
-            side: THREE.BackSide
+            opacity: density,
+            side: THREE.FrontSide
         });
 
         atmosphereMesh = new THREE.Mesh(atmosphereGeo, atmosphereMat);
-        scene.add(atmosphereMesh);
+        // La atmósfera es hija del planeta para rotar y acompañarlo en su órbita
+        planetMesh.add(atmosphereMesh);
     }
 
     function generateFeatures(scene, containerMesh, trees, rocks) {
@@ -160,6 +189,7 @@ const WorldModule = (() => {
 
     return {
         createPlanet,
+        destroyWorld,
         rotatePlanet,
         updateEcosystem,
         getRadius: () => currentRadius,
