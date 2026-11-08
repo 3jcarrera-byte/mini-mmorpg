@@ -1,7 +1,6 @@
 const InputModule = (() => {
     const keys = {};
     let isAiming = false;
-    const crosshairOffset = { x: 0, y: 0 };
 
     function init(canvas) {
         window.addEventListener('keydown', e => {
@@ -17,7 +16,7 @@ const InputModule = (() => {
                 }
             }
 
-            // Selector de Cámaras por teclas 1, 2 y 3
+            // 🌟 Selector de cámaras individual por botones 1, 2 y 3
             if (e.code === 'Digit1' || e.code === 'Numpad1') {
                 Game.setCameraMode('first');
             } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
@@ -57,8 +56,7 @@ const InputModule = (() => {
     return {
         init,
         isDown: (code) => !!keys[code],
-        isAiming: () => isAiming,
-        crosshairOffset
+        isAiming: () => isAiming
     };
 })();
 window.InputModule = InputModule;
