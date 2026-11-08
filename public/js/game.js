@@ -260,8 +260,8 @@ const Game = {
             targetEntity.mesh.getWorldPosition(worldPos);
             const distanceToTarget = this.localPlayer.position.distanceTo(worldPos);
             
-            // 🌟 Distancia de recolección estricta máxima de 0.4
-            if (distanceToTarget > 0.4) {
+            // 🌟 Distancia de recolección estricta máxima de 0.3
+            if (distanceToTarget > 0.3) {
                 console.log("Estás demasiado lejos del objeto.");
                 return;
             }
