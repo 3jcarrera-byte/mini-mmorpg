@@ -17,13 +17,13 @@ const WorldModule = (() => {
 
         scene.background = new THREE.Color(0x020208);
 
-        // Cargar configuración unificada desde GalaxyModule.PLANET_ARCHETYPES
+        // Cargar configuración unificada desde GalaxyModule.PLANET_ARCHETYPES con fallback robusto
         const config = (typeof GalaxyModule !== 'undefined' && GalaxyModule.PLANET_ARCHETYPES) 
             ? GalaxyModule.PLANET_ARCHETYPES[planetTypeKey] 
-            : (window.PLANET_TYPES ? window.PLANET_TYPES[planetTypeKey] : null) || { radiusRange: [4, 5] };
+            : (window.PLANET_TYPES ? window.PLANET_TYPES[planetTypeKey] : null) || { radiusRange: [4, 5], colors: { low: 0x2e5a1e, mid: 0x4a7c36, high: 0x8a8a8a, peak: 0xffffff } };
         
         // Sincronizar el radio exacto recibido del registro de la galaxia o calcularlo por defecto
-        if (customRadius !== null) {
+        if (customRadius !== null && customRadius !== undefined) {
             currentRadius = customRadius;
         } else if (config && Array.isArray(config.radiusRange)) {
             currentRadius = (config.radiusRange[0] + config.radiusRange[1]) / 2;
@@ -122,20 +122,19 @@ const WorldModule = (() => {
     }
 
     function createAtmosphereLayer(config) {
-        // Cálculo proporcional para que la altura de la atmósfera sea uniforme y correcta independientemente del radio del planeta
-        const baseReferenceRadius = 4.0;
-        const standardAtmosphereHeight = 2.0; 
-        const targetAtmosphereRadius = currentRadius + (standardAtmosphereHeight * (currentRadius / baseReferenceRadius));
+        // Fórmula de grosor dinámico amortiguada con BackSide para evitar pantalla negra en mundos colosales
+        const targetThickness = 4.0 * Math.sqrt(4.0 / currentRadius);
+        const atmosphereRadius = currentRadius + targetThickness;
 
-        const atmosphereGeo = new THREE.SphereGeometry(targetAtmosphereRadius, 32, 32);
+        const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
         const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.45;
 
         const atmosphereMat = new THREE.MeshBasicMaterial({
             color: config.atmosphereColor || 0x87ceeb,
             transparent: true,
             opacity: density,
-            side: THREE.FrontSide,
-            depthWrite: false
+            side: THREE.BackSide, 
+            depthWrite: false     
         });
 
         atmosphereMesh = new THREE.Mesh(atmosphereGeo, atmosphereMat);
