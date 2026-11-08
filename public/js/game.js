@@ -207,6 +207,7 @@ const Game = {
             return true;
         });
 
+        // 🌟 Forzamos la actualización de matrices mundiales para que Three.js refleje la rotación del planeta
         interactiveObjects.forEach(obj => {
             if (obj.mesh) {
                 obj.mesh.updateMatrixWorld(true);
@@ -228,13 +229,16 @@ const Game = {
             }
         }
 
-        // 🌟 Respaldo por proximidad (solución definitiva para el ecuador del planeta)
+        // 🌟 Respaldo por proximidad usando getWorldPosition para sincronizarse exactamente con el planeta en rotación
         if (!targetEntity) {
             let closestObj = null;
             let minDist = 1.3; // Rango exacto de interacción
 
             interactiveObjects.forEach(obj => {
-                const dist = this.localPlayer.position.distanceTo(obj.mesh.position);
+                const worldPos = new THREE.Vector3();
+                obj.mesh.getWorldPosition(worldPos);
+
+                const dist = this.localPlayer.position.distanceTo(worldPos);
                 if (dist < minDist) {
                     minDist = dist;
                     closestObj = obj;
@@ -244,7 +248,10 @@ const Game = {
         }
 
         if (targetEntity) {
-            const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
+            const worldPos = new THREE.Vector3();
+            targetEntity.mesh.getWorldPosition(worldPos);
+            const distanceToTarget = this.localPlayer.position.distanceTo(worldPos);
+            
             if (distanceToTarget > 1.3) {
                 console.log("Estás demasiado lejos del objeto.");
                 return;
