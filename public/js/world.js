@@ -35,9 +35,17 @@ const WorldModule = (() => {
             createOceanLayer(scene, worldConfig);
         }
 
+        // Crear cuerpos celestes (Estrella y Luna)
         createCelestialBodies(scene);
+
+        // Generar recursos en la superficie (Árboles y Rocas)
         generateFeatures(scene, planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
         
+        // Inicializar partículas atmosféricas si el módulo está disponible
+        if (typeof WeatherParticlesModule !== 'undefined') {
+            WeatherParticlesModule.create(scene, currentRadius, worldConfig);
+        }
+
         return planetMesh;
     }
 
@@ -185,19 +193,24 @@ const WorldModule = (() => {
         }
     }
 
-    function rotatePlanet() {
+    function rotatePlanet(delta = 0.016) {
         if (planetMesh) {
             planetMesh.rotation.y += 0.001;
         }
 
-        // Animación de movimiento/marejada para el océano o lava en sentido contrario o velocidad diferente
+        // Animación de flujo/marejada dinámica para el océano o lava
         if (oceanMesh) {
             oceanMesh.rotation.y -= 0.0006;
-            oceanMesh.rotation.x += 0.0002; // Sutil efecto de oleaje/flujo dinámico
+            oceanMesh.rotation.x += 0.0002;
         }
 
         if (celestialOrbitGroup) {
             celestialOrbitGroup.rotation.y += 0.0002;
+        }
+
+        // Actualizar partículas atmosféricas si existen
+        if (typeof WeatherParticlesModule !== 'undefined') {
+            WeatherParticlesModule.update(delta);
         }
     }
 
