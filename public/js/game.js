@@ -6,7 +6,7 @@ const Game = {
         speed: 0.03, 
         jumpSpeed: 0.04,    
         verticalVelocity: 0, 
-        altitude: 0,         
+        altitude: 0,       
         name: 'Héroe', 
         level: 1, 
         classType: 'guerrero', 
@@ -14,6 +14,7 @@ const Game = {
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
+        yawOffset: 0, // 🌟 Desplazamiento lateral de cámara para el efecto Over-the-Shoulder
         weaponRange: 15.0,
         radius: 0.08 // Radio físico compacto ajustado al mínimo
     },
@@ -24,7 +25,7 @@ const Game = {
     gravity: 0.004,
     cameraMode: 'third', // 'first', 'third', 'rts'
     isAiming: false,
-    
+     
     crosshairOffset: { x: 0, y: 0 },
     maxCrosshairRadius: 40,
     lastFrameTime: 0,
@@ -34,7 +35,7 @@ const Game = {
             this.localPlayer.name = characterData.name || 'Héroe';
             this.localPlayer.level = characterData.level || 1;
             this.localPlayer.classType = characterData.classType || 'guerrero';
-            
+             
             if (characterData.classType === 'mago') this.localPlayer.color = 0x0088ff;
             else if (characterData.classType === 'arquero') this.localPlayer.color = 0x00ff66;
             else this.localPlayer.color = 0xff0033;
@@ -74,7 +75,7 @@ const Game = {
         // Iluminación general y ambiental suave
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-        // --- CREAR EL PLANETA ESFÉRICO (Incluye Sol y ciclo lunar en world.js) ---
+        // --- CREAR EL PLANETA ESFÉRICO ---
         WorldModule.createPlanet(this.scene, { color: 0x1a4314, treeCount: 40, rockCount: 20 });
         if (typeof WorldModule.getRadius === 'function') {
             this.planetRadius = WorldModule.getRadius();
@@ -84,10 +85,11 @@ const Game = {
         this.localPlayer.position.set(0, this.planetRadius, 0);
         this.localPlayer.forward.set(0, 0, -1).normalize();
         this.localPlayer.pitch = 0;
+        this.localPlayer.yawOffset = 0;
         this.localPlayer.altitude = 0;
         this.localPlayer.verticalVelocity = 0;
 
-        // Crear malla del jugador local (versión compacta y pequeña)
+        // Crear malla del jugador local
         this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
         this.scene.add(this.localPlayer.mesh);
 
@@ -96,7 +98,7 @@ const Game = {
 
         this.createShooterCrosshair();
 
-        // 🌟 Inicializar el Módulo de Inventario / Bolso Independiente
+        // Inicializar el Módulo de Inventario / Bolso
         if (typeof InventoryModule !== 'undefined' && typeof InventoryModule.init === 'function') {
             InventoryModule.init();
         }
@@ -104,6 +106,17 @@ const Game = {
         // Eventos de teclado
         window.addEventListener('keydown', e => {
             this.keys[e.code] = true;
+
+            // 🌟 Si el inventario está abierto y presionas teclas de movimiento, cerrar inventario y devolver pointer lock
+            const invModal = document.getElementById('inventory-modal');
+            if (invModal && invModal.style.display === 'block') {
+                if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+                    invModal.style.display = 'none';
+                    if (canvas && typeof canvas.requestPointerLock === 'function') {
+                        canvas.requestPointerLock();
+                    }
+                }
+            }
 
             if (e.code === 'KeyV') {
                 if (this.cameraMode === 'first') {
@@ -123,7 +136,11 @@ const Game = {
         canvas.addEventListener('contextmenu', e => e.preventDefault());
         
         canvas.addEventListener('click', () => {
-            canvas.requestPointerLock();
+            // Solo solicitar pointer lock si el inventario NO está abierto
+            const invModal = document.getElementById('inventory-modal');
+            if (!invModal || invModal.style.display !== 'block') {
+                canvas.requestPointerLock();
+            }
         });
 
         canvas.addEventListener('mousedown', e => {
@@ -140,6 +157,7 @@ const Game = {
             }
         });
 
+        // 🌟 Control de mouse refinado para la cámara orbital y offset lateral
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.003;
@@ -149,8 +167,13 @@ const Game = {
                 this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
                 this.localPlayer.forward.normalize();
 
+                // Movimiento vertical del mouse: ajusta el pitch y desplaza el offset lateral (over-the-shoulder)
                 this.localPlayer.pitch -= e.movementY * sensitivity;
                 this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
+
+                // Si el mouse se mueve a la derecha (movementX > 0), la cámara se desplaza ligeramente a la izquierda (y viceversa)
+                this.localPlayer.yawOffset += e.movementX * 0.001;
+                this.localPlayer.yawOffset = Math.max(-0.4, Math.min(0.4, this.localPlayer.yawOffset));
 
                 this.crosshairOffset.x = 0;
                 this.crosshairOffset.y = 0;
@@ -235,7 +258,7 @@ const Game = {
         });
     },
 
-    // --- INTERACCIÓN DE TALA Y MINADO CON VERIFICACIÓN DE DISTANCIA ROBUSTA ---
+    // --- INTERACCIÓN DE TALA Y MINADO CON VERIFICACIÓN DE DISTANCIA ---
     handleBuildClick(e) {
         if (e.button !== 0) return; // Solo clic izquierdo
 
@@ -253,7 +276,6 @@ const Game = {
             let hitObject = intersects[0].object;
             let targetEntity = null;
 
-            // Subir por la jerarquía de padres de manera segura para encontrar la entidad interactiva
             let currentObj = hitObject;
             while (currentObj) {
                 targetEntity = interactiveObjects.find(obj => obj.mesh === currentObj);
@@ -262,7 +284,6 @@ const Game = {
             }
 
             if (targetEntity) {
-                // 🌟 VALIDACIÓN DE DISTANCIA (Máximo 1.5 unidades para recolectar/atacar)
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
                 if (distanceToTarget > 1.5) {
                     console.log("Estás demasiado lejos del objeto.");
@@ -278,7 +299,7 @@ const Game = {
                     }
                     console.log(`Madera recolectada: ${amount}`);
                 } 
-                else if (typeof targetEntity.mine === 'function' && targetEntity.health > 0) {
+                else if (typeof targetEntity.mine === 'function' && targetEntity.isReady) {
                     const gainedStone = targetEntity.mine();
                     
                     if (gainedStone > 0 && typeof InventoryModule !== 'undefined') {
@@ -290,7 +311,6 @@ const Game = {
         }
     },
 
-    // --- DETECTOR DE COLISIONES MÍNIMO Y PRECISO ---
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -339,12 +359,10 @@ const Game = {
         const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1);
         this.lastFrameTime = now;
 
-        // 1. Rotar planeta y ciclo de astros celestes (Sol y Luna)
         if (typeof WorldModule.rotatePlanet === 'function') {
             WorldModule.rotatePlanet();
         }
 
-        // 2. Actualizar el ecosistema del mundo
         if (typeof WorldModule.updateEcosystem === 'function') {
             WorldModule.updateEcosystem(delta, this.scene, WorldModule.getObstacles());
         }
@@ -356,7 +374,6 @@ const Game = {
 
             const R = this.planetRadius;
             
-            // Anclar y rotar al jugador solidariamente con el planeta
             const planetRotationStep = 0.001;
             p.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
             p.forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
@@ -429,7 +446,7 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS PARA AVATAR COMPACTO ---
+            // --- GESTIÓN DE CÁMARAS ORBITALES Y ARCO CIRCUNFERENCIAL ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
@@ -443,17 +460,20 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'third') {
-                let distanceBack = 2.5;
-                let heightUp = 1.0;
+                let baseDistance = this.isAiming ? 1.5 : 2.5;
+                let baseHeight = this.isAiming ? 0.8 : 1.0;
 
-                if (this.isAiming) {
-                    distanceBack = 1.5;
-                    heightUp = 0.8;
-                }
+                // 🌟 Movimiento vertical del mouse (pitch) mueve la cámara en porción de circunferencia (hacia la cabeza o los tobillos)
+                const arcRadius = baseDistance;
+                const arcHeightOffset = Math.sin(p.pitch) * arcRadius * 0.5;
+                const arcBackOffset = Math.cos(p.pitch) * arcRadius;
 
-                const camPos = p.position.clone()
-                    .add(normal.clone().multiplyScalar(heightUp))
-                    .sub(p.forward.clone().multiplyScalar(distanceBack));
+                let camPos = p.position.clone()
+                    .add(normal.clone().multiplyScalar(baseHeight + arcHeightOffset))
+                    .sub(p.forward.clone().multiplyScalar(arcBackOffset));
+
+                // 🌟 Desplazamiento lateral (Over-the-shoulder) según el movimiento horizontal del mouse
+                camPos.add(right.clone().multiplyScalar(p.yawOffset));
                 
                 const camNormal = camPos.clone().normalize();
                 if (camPos.length() < R + 0.3) {
@@ -463,7 +483,7 @@ const Game = {
                 this.camera.position.copy(camPos);
 
                 const lookDir = p.forward.clone();
-                lookDir.applyAxisAngle(right, p.pitch);
+                lookDir.applyAxisAngle(right, p.pitch * 0.5);
                 const targetLookAt = camPos.clone().add(lookDir.multiplyScalar(p.weaponRange));
                 this.camera.lookAt(targetLookAt);
 
