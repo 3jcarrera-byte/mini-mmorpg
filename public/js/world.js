@@ -230,7 +230,7 @@ const WorldModule = (() => {
         getRadius: () => planetRadius,
         getObstacles: () => obstacles,
         getInteractiveObjects: () => interactiveObjects,
-        getPlanetRotationY: () => planetMesh ? planetMesh.rotation.y : 0 // 🌟 Expone la rotación actual para sincronizar colisiones
+        getPlanetRotationY: () => planetMesh ? planetMesh.rotation.y : 0
     };
 })();
 
