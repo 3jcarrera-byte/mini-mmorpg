@@ -4,23 +4,15 @@ const TreeObject = (() => {
     function create(position, initialState = 'sapling', initialProgress = 0.2) {
         const group = new THREE.Group();
         
-        // 1. Tronco cilíndrico de color marrón
+        // 1. Tronco cilíndrico
         const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.45, 6);
-        const trunkMat = new THREE.MeshStandardMaterial({ 
-            color: 0x5c4033, 
-            roughness: 0.9, 
-            flatShading: true 
-        });
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9, flatShading: true });
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
         trunk.position.y = 0.22;
         group.add(trunk);
 
-        // 2. Capas de follaje (Pino estilizado en cono)
-        const leavesMat = new THREE.MeshStandardMaterial({ 
-            color: 0x2d8a39, 
-            roughness: 0.7, 
-            flatShading: true 
-        });
+        // 2. Capas de follaje (Pino estilizado)
+        const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d8a39, roughness: 0.7, flatShading: true });
         
         const layer1 = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.45, 5), leavesMat);
         layer1.position.y = 0.45;
@@ -34,7 +26,6 @@ const TreeObject = (() => {
         layer3.position.y = 0.9;
         group.add(layer3);
 
-        // Posicionamiento y alineación con la esfera del planeta
         group.position.copy(position);
         group.lookAt(0, 0, 0);
         group.rotateX(Math.PI / 2);
@@ -59,15 +50,19 @@ const TreeObject = (() => {
             seedTimer: 0,
 
             update(delta, scene, obstaclesList, allObjectsList) {
-                // Crecimiento progresivo del brote a adulto
+                // Crecimiento fluido de brote a adulto (5 segundos para pruebas)
                 if (this.state === 'sapling') {
-                    this.growthProgress += delta / 5.0; // 5 segundos para pruebas visuales rápidas
+                    this.growthProgress += delta / 5.0; 
                     if (this.growthProgress >= 1.0) {
                         this.growthProgress = 1.0;
                         this.state = 'adult';
-                        group.scale.set(1, 1, 1);
+                        group.scale.set(1, 1, 1, 1);
+                        // Asegurar visibilidad completa de todas las capas al ser adulto
+                        group.children.forEach(child => child.visible = true);
                     } else {
-                        group.scale.setScalar(Math.max(0.2, this.growthProgress));
+                        // Crecimiento gradual manteniendo estructura visible
+                        const currentScale = Math.max(0.3, window.THREE ? this.growthProgress : this.growthProgress);
+                        group.scale.setScalar(currentScale);
                     }
                     return;
                 }
@@ -85,9 +80,10 @@ const TreeObject = (() => {
                     if (this.regrowthTimer > 10) { 
                         this.regrowthTimer = 0;
                         this.state = 'sapling';
-                        this.growthProgress = 0.2;
+                        this.growthProgress = 0.3;
                         this.health = 100;
-                        group.scale.setScalar(0.2);
+                        group.scale.setScalar(0.3);
+                        group.children.forEach(child => child.visible = true);
                         
                         this.collider.radius = 0.18;
                         this.collider.height = 0.6;
@@ -101,6 +97,11 @@ const TreeObject = (() => {
                 this.state = 'stump';
                 this.health = 0;
                 this.regrowthTimer = 0;
+
+                // Dejar solo el tronco cortado (ocultamos las capas de follaje)
+                group.children.forEach((child, index) => {
+                    if (index > 0) child.visible = false; // Mantiene visible solo el tronco (índice 0) y lo aplana
+                });
 
                 group.scale.set(1, 0.25, 1);
                 this.collider.radius = 0.08;
@@ -134,8 +135,8 @@ const TreeObject = (() => {
                 }
 
                 if (validPositionFound && newPos) {
-                    const newTree = create(newPos, 'sapling', 0.2);
-                    newTree.mesh.scale.setScalar(0.2);
+                    const newTree = create(newPos, 'sapling', 0.3);
+                    newTree.mesh.scale.setScalar(0.3);
 
                     if (scene && typeof scene.add === 'function') {
                         scene.add(newTree.mesh);
@@ -146,7 +147,7 @@ const TreeObject = (() => {
             }
         };
 
-        group.scale.setScalar(Math.max(0.2, initialProgress));
+        group.scale.setScalar(Math.max(0.3, initialProgress));
         return treeEntity;
     }
 
