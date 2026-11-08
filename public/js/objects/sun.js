@@ -2,54 +2,47 @@
 
 const SunModule = (() => {
     let sunMesh = null;
-    let ambientLight = null;
+    let sunLight = null;
 
     function create(scene, options = {}) {
-        // Limpiar instancia previa si existe para evitar sobreexposición y fugas de memoria
-        destroy(scene);
+        const radius = options.radius || 4.0;
 
-        const radius = options.radius || 3.0;
-        
-        // El Sol es el centro absoluto del Sistema Solar (0, 0, 0)
+        // El Sol se ubica estrictamente en el centro (0,0,0) como el origen del sistema
         const sunGeo = new THREE.SphereGeometry(radius, 32, 32);
-        const sunMat = new THREE.MeshBasicMaterial({ color: 0xffea00 });
+        
+        // Usar MeshStandardMaterial con emisión alta para que actúe como una estrella brillante real
+        const sunMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffaa00,
+            emissive: 0xffea00,
+            emissiveIntensity: 2.0,
+            roughness: 0.2
+        });
         
         sunMesh = new THREE.Mesh(sunGeo, sunMat);
         sunMesh.position.set(0, 0, 0);
         scene.add(sunMesh);
 
-        // Luz direccional central que irradia hacia afuera en todas direcciones
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1.8);
+        // Luz direccional o puntual masiva que irradia desde el sol hacia afuera
+        sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
         sunLight.position.set(0, 0, 0);
         sunMesh.add(sunLight);
 
-        // Luz ambiental global para las zonas nocturnas
-        ambientLight = new THREE.AmbientLight(0x222244, 0.4);
+        // Luz ambiental para asegurar visibilidad base en el espacio y en las noches
+        const ambientLight = new THREE.AmbientLight(0x333355, 0.4);
         scene.add(ambientLight);
 
         return sunMesh;
     }
 
-    function destroy(scene) {
+    function rotateSun(delta = 0.016) {
         if (sunMesh) {
-            scene.remove(sunMesh);
-            sunMesh.geometry.dispose();
-            if (Array.isArray(sunMesh.material)) {
-                sunMesh.material.forEach(m => m.dispose());
-            } else {
-                sunMesh.material.dispose();
-            }
-            sunMesh = null;
-        }
-        if (ambientLight) {
-            scene.remove(ambientLight);
-            ambientLight = null;
+            sunMesh.rotation.y += 0.002; // Rotación propia del sol
         }
     }
 
     return {
         create,
-        destroy
+        rotateSun
     };
 })();
 
