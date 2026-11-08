@@ -180,8 +180,11 @@ const WorldModule = (() => {
                 if (featureData) {
                     if (featureData.mesh) {
                         featureData.mesh.position.copy(position);
-                        featureData.mesh.lookAt(planetMesh.position);
-                        featureData.mesh.rotateX(Math.PI / 2);
+                        
+                        // CORRECCIÓN: Alinear el objeto verticalmente hacia afuera de la esfera (superficie)
+                        const normal = position.clone().normalize();
+                        featureData.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+                        
                         containerMesh.add(featureData.mesh);
                     }
                     if (featureData.collider && featureData.collider.active !== false) {
