@@ -1,17 +1,15 @@
 // Módulo Modularizado de Árboles (TreeObject)
 const TreeObject = (() => {
 
-    function create(position, initialState = 'adult', initialProgress = 1.0) {
+    function create(position, initialState = 'sapling', initialProgress = 0.2) {
         const group = new THREE.Group();
         
-        // 1. Tronco cilíndrico
         const trunkGeo = new THREE.CylinderGeometry(0.06, 0.1, 0.45, 6);
         const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9, flatShading: true });
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
         trunk.position.y = 0.22;
         group.add(trunk);
 
-        // 2. Capas de follaje (Pino estilizado)
         const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d8a39, roughness: 0.7, flatShading: true });
         
         const layer1 = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.45, 5), leavesMat);
@@ -34,16 +32,17 @@ const TreeObject = (() => {
         const colliderRef = {
             position: group.position.clone(),
             radius: 0.12,
-            height: 0.4
+            height: 0.4,
+            active: true // 🌟 Control de colisión activa
         };
 
         const treeEntity = {
-            type: 'tree', // 🌟 Sincronizado con game.js
+            type: 'tree',
             mesh: group,
             collider: colliderRef,
             resourceType: 'wood',
             
-            state: initialState, // 'sapling', 'adult', 'stump'
+            state: initialState, 
             growthProgress: initialProgress,
             health: 100,
             regrowthTimer: 0,
@@ -64,6 +63,7 @@ const TreeObject = (() => {
                         this.state = 'adult';
                         group.scale.set(1, 1, 1);
                         group.children.forEach(child => child.visible = true);
+                        this.collider.active = true;
                     } else {
                         const currentScale = Math.max(0.3, this.growthProgress);
                         group.scale.setScalar(currentScale);
@@ -91,6 +91,7 @@ const TreeObject = (() => {
                         
                         this.collider.radius = 0.12;
                         this.collider.height = 0.4;
+                        this.collider.active = true; // Reactivar colisión al renacer
                     }
                 }
             },
@@ -109,6 +110,7 @@ const TreeObject = (() => {
                 group.scale.set(1, 0.25, 1);
                 this.collider.radius = 0.06;
                 this.collider.height = 0.1;
+                this.collider.active = false; // 🌟 Desactivar colisión invisible del tocón
             },
 
             trySpawnSeed(scene, obstaclesList, allObjectsList) {
