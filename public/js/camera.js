@@ -18,7 +18,7 @@ const CameraModule = (() => {
             camera.lookAt(targetLookAt);
 
         } else if (cameraMode === 'third') {
-            // Cámara 2: Tercera persona
+            // Cámara 2: Tercera persona (Over-the-shoulder)
             const baseHeight = 0.6;
             const pitchOffset = Math.sin(player.pitch) * 0.25;
 
@@ -36,7 +36,7 @@ const CameraModule = (() => {
             camera.lookAt(lookTarget);
 
         } else if (cameraMode === 'rts') {
-            // Cámara 3: Tipo Warcraft / RTS (con límite inferior adaptado a los pies)
+            // Cámara 3: Tipo Warcraft / RTS (con límite inferior adaptado a la línea de los pies)
             const rtsHeight = 3.0; 
             const rtsBack = 1.8;   
             const rtsPitch = Math.max(-0.55, Math.min(0.08, player.pitch));
