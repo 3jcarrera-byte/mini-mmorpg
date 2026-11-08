@@ -44,7 +44,7 @@ const CameraModule = (() => {
 
         } else if (cameraMode === 'rts') {
             // 🌟 Cámara 3: Tipo Warcraft / RTS con límites verticales (pitch) muy amplios para mirar mucho más abajo y arriba
-            const rtsHeight = 2.8; 
+            const rtsHeight = 1.8; 
             const rtsBack = 0.5;   
             
             // Rango vertical extendido: permite bajar mucho más hacia los pies/suelo y subir más arriba
