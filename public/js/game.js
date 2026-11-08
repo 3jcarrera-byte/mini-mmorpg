@@ -101,6 +101,15 @@ const Game = {
         if (typeof InputModule !== 'undefined') {
             InputModule.init(canvas);
         }
+
+        // 🌟 Asegurar que al hacer clic en el canvas del juego se reactive el control de la cámara
+        canvas.addEventListener('click', () => {
+            const inventoryModal = document.getElementById('inventory-modal');
+            const isInvOpen = inventoryModal && inventoryModal.style.display === 'block';
+            if (!isInvOpen && !document.pointerLockElement) {
+                canvas.requestPointerLock();
+            }
+        });
     },
 
     handleMouseMove(e) {
@@ -228,10 +237,10 @@ const Game = {
             }
         }
 
-        // 🌟 Respaldo por proximidad ajustado estrictamente a 0.6 de distancia
+        // 🌟 Respaldo por proximidad ajustado estrictamente a 0.2 de distancia
         if (!targetEntity) {
             let closestObj = null;
-            let minDist = 0.6; 
+            let minDist = 0.2; 
 
             interactiveObjects.forEach(obj => {
                 const worldPos = new THREE.Vector3();
@@ -251,8 +260,8 @@ const Game = {
             targetEntity.mesh.getWorldPosition(worldPos);
             const distanceToTarget = this.localPlayer.position.distanceTo(worldPos);
             
-            // 🌟 Distancia de recolección estricta máxima de 0.6
-            if (distanceToTarget > 0.6) {
+            // 🌟 Distancia de recolección estricta máxima de 0.2
+            if (distanceToTarget > 0.2) {
                 console.log("Estás demasiado lejos del objeto.");
                 return;
             }
