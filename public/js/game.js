@@ -14,9 +14,9 @@ const Game = {
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
-        yawOffset: 0, // Desplazamiento lateral de cámara para el efecto Over-the-Shoulder
+        yawOffset: 0.35, // Desplazamiento lateral fijo para el over-the-shoulder estricto
         weaponRange: 15.0,
-        radius: 0.08 // Radio físico compacto ajustado al mínimo
+        radius: 0.22 // Radio físico amplio para bloquear el paso ante árboles y piedras
     },
     remotePlayers: {},
     keys: {},
@@ -85,7 +85,7 @@ const Game = {
         this.localPlayer.position.set(0, this.planetRadius, 0);
         this.localPlayer.forward.set(0, 0, -1).normalize();
         this.localPlayer.pitch = 0;
-        this.localPlayer.yawOffset = 0;
+        this.localPlayer.yawOffset = 0.35; // Posición lateral inicial fija
         this.localPlayer.altitude = 0;
         this.localPlayer.verticalVelocity = 0;
 
@@ -156,7 +156,7 @@ const Game = {
             }
         });
 
-        // Control de mouse refinado para la cámara orbital y offset lateral
+        // 🌟 Control del ratón: Giro del personaje con X y control vertical de inclinación sin tocar la espalda
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.003;
@@ -166,13 +166,14 @@ const Game = {
                 this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
                 this.localPlayer.forward.normalize();
 
-                // Movimiento vertical del mouse: ajusta el pitch y desplaza el offset lateral (over-the-shoulder)
+                // Movimiento vertical (adelante/atrás): limita estrictamente el ángulo de elevación
                 this.localPlayer.pitch -= e.movementY * sensitivity;
-                this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
+                this.localPlayer.pitch = Math.max(-0.4, Math.min(0.4, this.localPlayer.pitch));
 
-                // Desplazamiento lateral sutil según el movimiento horizontal
-                this.localPlayer.yawOffset += e.movementX * 0.001;
-                this.localPlayer.yawOffset = Math.max(-0.3, Math.min(0.3, this.localPlayer.yawOffset));
+                // Cambio lateral opcional muy sutil por movimiento horizontal (mantiene la cámara en el hombro)
+                if (e.movementX !== 0) {
+                    this.localPlayer.yawOffset = e.movementX > 0 ? 0.35 : -0.35;
+                }
 
                 this.crosshairOffset.x = 0;
                 this.crosshairOffset.y = 0;
@@ -284,7 +285,7 @@ const Game = {
 
             if (targetEntity) {
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
-                if (distanceToTarget > 1.8) {
+                if (distanceToTarget > 2.0) {
                     console.log("Estás demasiado lejos del objeto.");
                     return;
                 }
@@ -310,6 +311,7 @@ const Game = {
         }
     },
 
+    // 🌟 Colisiones robustas y estrictas para evitar que el jugador traspase árboles y piedras
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -330,21 +332,10 @@ const Game = {
             if (!obsPos) continue;
 
             const nextDist = nextPos.distanceTo(obsPos);
-            const currentDist = this.localPlayer.position.distanceTo(obsPos);
-            
-            const obstacleRadius = obs.radius || 0.12; 
-            const obstacleHeight = obs.height || 0.25;
+            const obstacleRadius = (obs.radius || 0.15) + 0.12; // Margen de bloqueo sólido
 
             if (nextDist < (playerRadius + obstacleRadius)) {
-                if (currentDist < (playerRadius + obstacleRadius)) {
-                    if (nextDist >= currentDist) {
-                        return false; 
-                    }
-                }
-
-                if (currentAltitude < obstacleHeight) {
-                    return true; 
-                }
+                return true; // Bloquea el movimiento impidiendo traspasarlo
             }
         }
         return false;
@@ -445,7 +436,7 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS ORBITALES (Arco cerrado y controlado) ---
+            // --- GESTIÓN DE CÁMARA TERCERA PERSONA (Over-the-shoulder lateral estricto y compacto) ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
@@ -459,23 +450,16 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'third') {
-                let baseDistance = this.isAiming ? 1.4 : 2.2;
-                let baseHeight = this.isAiming ? 0.7 : 0.9;
+                const baseDistance = 1.6; // Distancia cercana al cuerpo
+                const baseHeight = 0.6;
 
-                // 🌟 Arco cenital cerrado y acotado (evita que la cámara se abra demasiado)
-                const clampedPitch = Math.max(-0.5, Math.min(0.5, p.pitch));
-                const arcRadius = baseDistance;
-                const arcHeightOffset = Math.sin(clampedPitch) * arcRadius * 0.3;
-                const arcBackOffset = Math.cos(clampedPitch) * arcRadius;
+                // Movimiento vertical adelante/atrás ajusta sutilmente la altura sin barridos circulares
+                const pitchOffset = Math.sin(p.pitch) * 0.25;
 
                 let camPos = p.position.clone()
-                    .add(normal.clone().multiplyScalar(baseHeight + arcHeightOffset))
-                    .sub(p.forward.clone().multiplyScalar(arcBackOffset));
+                    .add(normal.clone().multiplyScalar(baseHeight + pitchOffset))
+                    .add(right.clone().multiplyScalar(p.yawOffset)); // Posición lateral fija al hombro
 
-                // 🌟 Desplazamiento lateral Over-the-shoulder sutil y cerrado
-                const clampedYawOffset = Math.max(-0.25, Math.min(0.25, p.yawOffset));
-                camPos.add(right.clone().multiplyScalar(clampedYawOffset));
-                
                 const camNormal = camPos.clone().normalize();
                 if (camPos.length() < R + 0.3) {
                     camPos.copy(camNormal.multiplyScalar(R + 0.3));
@@ -483,10 +467,9 @@ const Game = {
 
                 this.camera.position.copy(camPos);
 
-                const lookDir = p.forward.clone();
-                lookDir.applyAxisAngle(right, clampedPitch * 0.4);
-                const targetLookAt = camPos.clone().add(lookDir.multiplyScalar(p.weaponRange));
-                this.camera.lookAt(targetLookAt);
+                // Focalización directa hacia adelante del personaje
+                const lookTarget = p.position.clone().add(normal.clone().multiplyScalar(0.3)).add(p.forward.clone().multiplyScalar(2.0));
+                this.camera.lookAt(lookTarget);
 
             } else if (this.cameraMode === 'rts') {
                 const rtsHeight = 3.0;
@@ -496,10 +479,7 @@ const Game = {
                     .sub(p.forward.clone().multiplyScalar(rtsBack));
 
                 this.camera.position.copy(camPos);
-                
-                const lookDir = p.forward.clone();
-                lookDir.applyAxisAngle(right, p.pitch);
-                const targetLookAt = p.position.clone().add(lookDir.multiplyScalar(2.0));
+                const targetLookAt = p.position.clone().add(p.forward.clone().multiplyScalar(2.0));
                 this.camera.lookAt(targetLookAt);
             }
         }
