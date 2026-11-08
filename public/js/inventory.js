@@ -1,10 +1,13 @@
-// Módulo de Inventario Estético y Funcional por Slots (inventory.js)
+// Módulo de Inventario Translúcido con Drag & Drop y Diseño Minimalista (inventory.js)
 const InventoryModule = (() => {
     const maxSlots = 20; // 4 filas x 5 columnas
-    let items = [
-        { id: 1, type: 'wood', name: 'Madera', count: 100, icon: '🪵', color: '#f39c12' },
-        { id: 2, type: 'stone', name: 'Piedra', count: 0, icon: '🪨', color: '#bdc3c7' }
-    ];
+    let items = Array(maxSlots).fill(null);
+    
+    // Posicionar los recursos iniciales en los primeros slots
+    items[0] = { id: 1, type: 'wood', name: 'Madera', count: 100, icon: '🪵', color: '#e67e22' };
+    items[1] = { id: 2, type: 'stone', name: 'Piedra', count: 0, icon: '🪨', color: '#95a5a6' };
+
+    let draggedIndex = null;
 
     function init() {
         createUI();
@@ -15,19 +18,20 @@ const InventoryModule = (() => {
 
         const container = document.querySelector('.game-container') || document.body;
 
-        // 1. Botón Flotante Estilizado del Bolso
+        // 1. Botón minimalista y discreto en la esquina superior/inferior (fuera del canvas de juego)
         if (!document.getElementById('btn-inventory-toggle')) {
             const btnToggle = document.createElement('button');
             btnToggle.id = 'btn-inventory-toggle';
-            btnToggle.innerHTML = '🎒 BOLSO <span style="opacity: 0.7; font-size: 11px;">[B]</span>';
+            btnToggle.innerHTML = '🎒 [B]';
             btnToggle.style.cssText = `
-                position: absolute; bottom: 25px; right: 25px; z-index: 50; 
-                padding: 12px 20px; background: linear-gradient(135deg, #111b21 0%, #080f14 100%); 
-                color: #00ffcc; border: 2px solid #00ffcc; cursor: pointer; 
-                border-radius: 8px; font-family: monospace; font-weight: bold; font-size: 13px;
-                box-shadow: 0 0 15px rgba(0,255,204,0.3), inset 0 0 10px rgba(0,255,204,0.1);
-                transition: all 0.2s ease;
+                position: absolute; top: 15px; right: 15px; z-index: 50; 
+                padding: 6px 12px; background: rgba(0, 0, 0, 0.4); 
+                color: rgba(255, 255, 255, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); 
+                cursor: pointer; border-radius: 6px; font-family: monospace; font-size: 12px;
+                backdrop-filter: blur(4px); transition: all 0.2s ease;
             `;
+            btnToggle.onmouseover = () => { btnToggle.style.background = 'rgba(0,0,0,0.7);'; btnToggle.style.color = '#fff'; };
+            btnToggle.onmouseout = () => { btnToggle.style.background = 'rgba(0, 0, 0, 0.4);'; btnToggle.style.color = 'rgba(255,255,255,0.8)'; };
             btnToggle.onclick = (e) => {
                 e.stopPropagation();
                 toggle();
@@ -35,53 +39,51 @@ const InventoryModule = (() => {
             container.appendChild(btnToggle);
         }
 
-        // 2. Ventana Modal Principal (Estilo Panel Sci-Fi / RPG)
+        // 2. Ventana Modal Translúcida (Glassmorphism elegante)
         const modal = document.createElement('div');
         modal.id = 'inventory-modal';
         modal.style.cssText = `
             display: none; position: absolute; top: 50%; left: 50%; 
-            transform: translate(-50%, -50%); width: 400px; 
-            background: rgba(10, 14, 20, 0.95); 
-            border: 2px solid #00ffcc; padding: 22px; color: #fff; 
-            z-index: 200; border-radius: 12px; font-family: monospace; 
-            box-shadow: 0 0 40px rgba(0,0,0,0.9), 0 0 20px rgba(0,255,204,0.2);
-            backdrop-filter: blur(6px);
-            pointer-events: auto; /* Asegura que reciba eventos de mouse */
+            transform: translate(-50%, -50%); width: 360px; 
+            background: rgba(15, 17, 23, 0.75); 
+            border: 1px solid rgba(255, 255, 255, 0.12); padding: 20px; color: #fff; 
+            z-index: 200; border-radius: 14px; font-family: monospace; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            backdrop-filter: blur(12px);
+            pointer-events: auto;
         `;
         
         modal.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid rgba(0,255,204,0.3); padding-bottom: 12px; margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 15px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 20px;">🎒</span>
-                    <h3 style="margin: 0; color: #00ffcc; font-size: 16px; letter-spacing: 1.5px;">INVENTARIO DEL HÉROE</h3>
+                    <span style="font-size: 16px;">🎒</span>
+                    <h3 style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px; letter-spacing: 1px;">INVENTARIO</h3>
                 </div>
-                <button id="close-inv-btn" style="background: rgba(255,85,85,0.1); border: 1px solid #ff5555; color: #ff5555; width: 28px; height: 28px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s;">✕</button>
+                <button id="close-inv-btn" style="background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 16px; cursor: pointer; transition: color 0.2s;">✕</button>
             </div>
 
             <!-- Cuadrícula de Slots -->
-            <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-height: 280px; overflow-y: auto; padding: 4px;">
+            <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 2px;">
                 <!-- Se llena dinámicamente -->
             </div>
 
-            <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; display: flex; justify-content: space-between; font-size: 11px; color: #88a; ">
-                <span>Capacidad: <strong id="inv-capacity" style="color: #00ffcc;">2/20</strong> slots</span>
-                <span>Pulsa <strong style="color: #00ffcc;">[B]</strong> para cerrar</span>
+            <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; display: flex; justify-content: space-between; font-size: 10px; color: rgba(255,255,255,0.4);">
+                <span>Usados: <strong id="inv-capacity" style="color: rgba(255,255,255,0.8);">0/20</strong></span>
+                <span>Arrastra para mover • <strong style="color: rgba(255,255,255,0.8);">[B]</strong> cerrar</span>
             </div>
         `;
         container.appendChild(modal);
 
-        // Evitar que los clics dentro del modal cierren o afecten el juego subyacente
-        modal.addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
+        modal.addEventListener('click', (e) => e.stopPropagation());
 
         const closeBtn = modal.querySelector('#close-inv-btn');
+        closeBtn.onmouseover = () => { closeBtn.style.color = '#fff'; };
+        closeBtn.onmouseout = () => { closeBtn.style.color = 'rgba(255,255,255,0.5)'; };
         closeBtn.onclick = (e) => {
             e.stopPropagation();
             toggle();
         };
 
-        // Escuchar tecla B de forma global
         window.addEventListener('keydown', (e) => {
             if (e.code === 'KeyB') {
                 toggle();
@@ -104,20 +106,61 @@ const InventoryModule = (() => {
             const slot = document.createElement('div');
             
             slot.style.cssText = `
-                aspect-ratio: 1; background: rgba(0, 0, 0, 0.4); 
-                border: 1px solid ${slotItem && slotItem.count > 0 ? 'rgba(0,255,204,0.4)' : 'rgba(255,255,255,0.08)'}; 
+                aspect-ratio: 1; background: rgba(0, 0, 0, 0.25); 
+                border: 1px solid rgba(255, 255, 255, 0.08); 
                 border-radius: 8px; display: flex; flex-direction: column; 
                 align-items: center; justify-content: center; position: relative; 
-                box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);
+                transition: all 0.15s ease; cursor: grab;
             `;
+
+            slot.setAttribute('data-index', i);
+
+            // Configurar eventos de Drag & Drop nativos
+            slot.addEventListener('dragstart', (e) => {
+                draggedIndex = i;
+                e.dataTransfer.setData('text/plain', i);
+                slot.style.opacity = '0.4';
+            });
+
+            slot.addEventListener('dragend', () => {
+                slot.style.opacity = '1';
+                draggedIndex = null;
+            });
+
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault(); // Necesario para permitir soltar
+                slot.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                slot.style.background = 'rgba(255, 255, 255, 0.05)';
+            });
+
+            slot.addEventListener('dragleave', () => {
+                slot.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                slot.style.background = 'rgba(0, 0, 0, 0.25)';
+            });
+
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                const targetIndex = i;
+
+                if (!isNaN(sourceIndex) && sourceIndex !== targetIndex) {
+                    // Intercambiar posiciones de los ítems (Swap)
+                    const temp = items[sourceIndex];
+                    items[sourceIndex] = items[targetIndex];
+                    items[targetIndex] = temp;
+                    renderGrid();
+                }
+            });
 
             if (slotItem && slotItem.count > 0) {
                 usedSlots++;
+                slot.setAttribute('draggable', 'true');
                 slot.innerHTML = `
-                    <span style="font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">${slotItem.icon}</span>
-                    <span style="position: absolute; bottom: 3px; right: 5px; font-size: 11px; color: ${slotItem.color}; font-weight: bold; background: rgba(5,10,15,0.85); padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">${slotItem.count}</span>
+                    <span style="font-size: 22px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); pointer-events: none;">${slotItem.icon}</span>
+                    <span style="position: absolute; bottom: 3px; right: 4px; font-size: 10px; color: ${slotItem.color}; font-weight: bold; background: rgba(0,0,0,0.6); padding: 1px 3px; border-radius: 3px; pointer-events: none;">${slotItem.count}</span>
                 `;
             } else {
+                slot.setAttribute('draggable', 'false');
                 slot.style.opacity = '0.3';
             }
 
@@ -135,7 +178,6 @@ const InventoryModule = (() => {
         if (isOpen) {
             modal.style.display = 'none';
         } else {
-            // 🌟 Liberar el bloqueo del mouse (Pointer Lock) para permitir navegar en el menú
             if (document.pointerLockElement) {
                 document.exitPointerLock();
             }
@@ -145,20 +187,25 @@ const InventoryModule = (() => {
     }
 
     function addItem(type, amount) {
-        let existingItem = items.find(i => i.type === type);
+        // Buscar si ya existe el ítem en algún slot para acumularlo
+        let existingItem = items.find(i => i && i.type === type);
         if (existingItem) {
             existingItem.count += amount;
-        } else if (items.length < maxSlots) {
-            const icons = { wood: '🪵', stone: '🪨' };
-            const colors = { wood: '#f39c12', stone: '#bdc3c7' };
-            items.push({
-                id: items.length + 1,
-                type: type,
-                name: type.charAt(0).toUpperCase() + type.slice(1),
-                count: amount,
-                icon: icons[type] || '📦',
-                color: colors[type] || '#ffffff'
-            });
+        } else {
+            // Buscar el primer slot vacío disponible
+            let emptyIndex = items.findIndex(i => i === null);
+            if (emptyIndex !== -1) {
+                const icons = { wood: '🪵', stone: '🪨' };
+                const colors = { wood: '#e67e22', stone: '#bdc3c7' };
+                items[emptyIndex] = {
+                    id: Date.now(),
+                    type: type,
+                    name: type.charAt(0).toUpperCase() + type.slice(1),
+                    count: amount,
+                    icon: icons[type] || '📦',
+                    color: colors[type] || '#ffffff'
+                };
+            }
         }
 
         renderGrid();
@@ -170,12 +217,22 @@ const InventoryModule = (() => {
     }
 
     function getData() {
-        let woodItem = items.find(i => i.type === 'wood');
-        let stoneItem = items.find(i => i.type === 'stone');
+        let woodCount = 0;
+        let stoneCount = 0;
+        let used = 0;
+
+        items.forEach(item => {
+            if (item && item.count > 0) {
+                used++;
+                if (item.type === 'wood') woodCount += item.count;
+                if (item.type === 'stone') stoneCount += item.count;
+            }
+        });
+
         return {
-            wood: woodItem ? woodItem.count : 0,
-            stone: stoneItem ? stoneItem.count : 0,
-            slotsUsed: items.filter(i => i.count > 0).length
+            wood: woodCount,
+            stone: stoneCount,
+            slotsUsed: used
         };
     }
 
