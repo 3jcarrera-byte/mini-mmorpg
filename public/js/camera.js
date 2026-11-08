@@ -20,7 +20,7 @@ const CameraModule = (() => {
         } else if (cameraMode === 'third') {
             // 🌟 Cámara 2: Tercera persona estilo CODM (más pegada al hombro y cercana)
             const baseDistance = 1.2; 
-            const baseHeight = 0.65;
+            const baseHeight = 0.85;
             const codmYawOffset = 0.16; // Desplazamiento lateral compacto tipo CODM
             const pitchOffset = Math.sin(player.pitch) * 0.2;
 
@@ -48,7 +48,7 @@ const CameraModule = (() => {
             const rtsBack = 0.5;   
             
             // Rango vertical extendido: permite bajar mucho más hacia los pies/suelo y subir más arriba
-            const rtsPitch = Math.max(-1.3, Math.min(0.6, player.pitch));
+            const rtsPitch = Math.max(-0.3, Math.min(0.6, player.pitch));
 
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(rtsHeight))
