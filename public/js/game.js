@@ -4,6 +4,7 @@ const Game = {
     socket: null, scene: null, camera: null, renderer: null,
     localPlayer: { 
         mesh: null, 
+        baseSpeed: 0.03,
         speed: 0.03, 
         jumpSpeed: 0.04,    
         verticalVelocity: 0, 
@@ -93,9 +94,17 @@ const Game = {
             const targetPlanetData = registry.find(p => p.id === activePlanetId);
             
             if (targetPlanetData) {
-                // Mapeo seguro con soporte para ambas claves (planetTypeKey o type)
                 this.currentPlanetKey = targetPlanetData.planetTypeKey || targetPlanetData.type || 'TEMPERATE_FOREST';
                 this.planetRadius = targetPlanetData.radius || 5.0;
+
+                // Asignar gravedad y propiedades físicas coherentes según el arquetipo del planeta
+                const archetype = GalaxyModule.PLANET_ARCHETYPES[this.currentPlanetKey];
+                if (archetype && archetype.gravity) {
+                    // Escalar gravedad del motor en función de la gravedad del planeta (referencia base 9.8)
+                    this.gravity = (archetype.gravity / 9.8) * 0.0038;
+                    this.localPlayer.jumpSpeed = Math.sqrt(this.gravity * 0.4); // Impulsor de salto coherente
+                }
+
                 activePlanetMesh = GalaxyModule.loadPlanetScene(this.scene, activePlanetId);
             }
         }
@@ -363,124 +372,3 @@ const Game = {
 
             const rotatedObsPos = basePos.clone();
             rotatedObsPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), currentPlanetRotation);
-
-            const nextDist = nextPos.distanceTo(rotatedObsPos);
-            const obstacleRadius = obs.radius || 0.08;
-
-            if (nextDist < (playerRadius + obstacleRadius)) {
-                return true; 
-            }
-        }
-        return false;
-    },
-
-    loop() {
-        if (!this.isGameRunning) return;
-        requestAnimationFrame(() => this.loop());
-
-        const now = performance.now();
-        const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1);
-        this.lastFrameTime = now;
-
-        if (typeof WorldModule.rotatePlanet === 'function') {
-            WorldModule.rotatePlanet();
-        }
-
-        if (typeof WorldModule.updateEcosystem === 'function') {
-            WorldModule.updateEcosystem(delta, this.scene, WorldModule.getObstacles());
-        }
-
-        if (this.localPlayer.mesh) {
-            const p = this.localPlayer;
-            const crosshair = document.getElementById('game-crosshair');
-            let isMoving = false;
-
-            const R = this.planetRadius;
-            
-            const planetRotationStep = 0.001;
-            p.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
-            p.forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
-
-            const planetMesh = (typeof WorldModule !== 'undefined' && typeof WorldModule.getPlanetMesh === 'function') ? WorldModule.getPlanetMesh() : null;
-            const planetGlobalCenter = new THREE.Vector3();
-            if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
-
-            let normal = p.position.clone().sub(planetGlobalCenter).normalize();
-
-            p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
-            const right = new THREE.Vector3().crossVectors(p.forward, normal).normalize();
-
-            let moveForward = 0;
-            let moveSide = 0;
-
-            if (InputModule.isDown('KeyW') || InputModule.isDown('ArrowUp')) { moveForward += p.speed; isMoving = true; }
-            if (InputModule.isDown('KeyS') || InputModule.isDown('ArrowDown')) { moveForward -= p.speed; isMoving = true; }
-            if (InputModule.isDown('KeyA') || InputModule.isDown('ArrowLeft')) { moveSide -= p.speed; isMoving = true; }
-            if (InputModule.isDown('KeyD') || InputModule.isDown('ArrowRight')) { moveSide += p.speed; isMoving = true; }
-
-            if (InputModule.isDown('Space') && p.altitude <= 0.001) {
-                p.verticalVelocity = p.jumpSpeed;
-            }
-
-            p.verticalVelocity -= this.gravity;
-            p.altitude += p.verticalVelocity;
-
-            if (p.altitude <= 0) {
-                p.altitude = 0;
-                p.verticalVelocity = 0;
-            }
-
-            if (crosshair) {
-                crosshair.style.display = 'block';
-                const scale = isMoving ? 'scale(1.2)' : 'scale(1)';
-                crosshair.style.transform = `translate(-50%, -50%) ${scale}`;
-            }
-
-            const targetPos = p.position.clone();
-            const tempForward = p.forward.clone();
-
-            if (moveForward !== 0) {
-                const axis = new THREE.Vector3().crossVectors(normal, p.forward).normalize();
-                const angle = moveForward / R;
-                targetPos.applyAxisAngle(axis, angle);
-                tempForward.applyAxisAngle(axis, angle);
-            }
-
-            if (moveSide !== 0) {
-                const axis = new THREE.Vector3().crossVectors(normal, right).normalize();
-                const angle = moveSide / R;
-                targetPos.applyAxisAngle(axis, angle);
-                tempForward.applyAxisAngle(axis, angle);
-            }
-
-            targetPos.sub(planetGlobalCenter).normalize().multiplyScalar(R + p.altitude).add(planetGlobalCenter);
-
-            if (!this.checkCollision(targetPos, p.altitude)) {
-                p.position.copy(targetPos);
-                p.forward.copy(tempForward);
-            }
-
-            normal = p.position.clone().sub(planetGlobalCenter).normalize();
-            p.forward.addScaledVector(normal, -p.forward.dot(normal)).normalize();
-
-            p.mesh.position.copy(p.position);
-
-            const rotMatrix = new THREE.Matrix4().makeBasis(right, normal, p.forward.clone().negate());
-            p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
-            
-            p.mesh.visible = (this.cameraMode !== 'first');
-
-            if ((moveForward !== 0 || moveSide !== 0 || p.altitude > 0) && this.socket) {
-                this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
-            }
-
-            if (typeof CameraModule !== 'undefined') {
-                CameraModule.updateCamera(this.camera, p, this.cameraMode, R);
-            }
-        }
-
-        this.renderer.render(this.scene, this.camera);
-    }
-};
-
-window.GameModule = Game;
