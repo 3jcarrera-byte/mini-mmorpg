@@ -14,9 +14,9 @@ const Game = {
         position: new THREE.Vector3(0, 5.0, 0),
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
-        yawOffset: 0.35, // Desplazamiento lateral fijo para el over-the-shoulder estricto
+        yawOffset: 0.35, // Desplazamiento lateral fijo en tercera persona
         weaponRange: 15.0,
-        radius: 0.22 // Radio físico amplio para bloquear el paso ante árboles y piedras
+        radius: 0.22 // Radio físico sólido para colisiones
     },
     remotePlayers: {},
     keys: {},
@@ -72,24 +72,20 @@ const Game = {
         this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
         this.renderer.setSize(800, 600);
 
-        // Iluminación general y ambiental suave
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-        // --- CREAR EL PLANETA ESFÉRICO ---
         WorldModule.createPlanet(this.scene, { color: 0x1a4314, treeCount: 40, rockCount: 20 });
         if (typeof WorldModule.getRadius === 'function') {
             this.planetRadius = WorldModule.getRadius();
         }
 
-        // Posición inicial sobre el planeta
         this.localPlayer.position.set(0, this.planetRadius, 0);
         this.localPlayer.forward.set(0, 0, -1).normalize();
         this.localPlayer.pitch = 0;
-        this.localPlayer.yawOffset = 0.35; // Posición lateral inicial fija
+        this.localPlayer.yawOffset = 0.35;
         this.localPlayer.altitude = 0;
         this.localPlayer.verticalVelocity = 0;
 
-        // Crear malla del jugador local
         this.localPlayer.mesh = this.createPlayerAvatar(this.localPlayer.classType, this.localPlayer.color);
         this.scene.add(this.localPlayer.mesh);
 
@@ -98,16 +94,13 @@ const Game = {
 
         this.createShooterCrosshair();
 
-        // Inicializar el Módulo de Inventario / Bolso
         if (typeof InventoryModule !== 'undefined' && typeof InventoryModule.init === 'function') {
             InventoryModule.init();
         }
 
-        // Eventos de teclado
         window.addEventListener('keydown', e => {
             this.keys[e.code] = true;
 
-            // Si el inventario está abierto y presionas teclas de movimiento, cerrar inventario y devolver pointer lock
             const invModal = document.getElementById('inventory-modal');
             if (invModal && invModal.style.display === 'block') {
                 if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
@@ -156,7 +149,6 @@ const Game = {
             }
         });
 
-        // 🌟 Control del ratón: Giro del personaje con X y control vertical de inclinación sin tocar la espalda
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === canvas) {
                 const sensitivity = 0.003;
@@ -166,14 +158,8 @@ const Game = {
                 this.localPlayer.forward.applyAxisAngle(normal, yawDelta);
                 this.localPlayer.forward.normalize();
 
-                // Movimiento vertical (adelante/atrás): limita estrictamente el ángulo de elevación
                 this.localPlayer.pitch -= e.movementY * sensitivity;
-                this.localPlayer.pitch = Math.max(-0.4, Math.min(0.4, this.localPlayer.pitch));
-
-                // Cambio lateral opcional muy sutil por movimiento horizontal (mantiene la cámara en el hombro)
-                if (e.movementX !== 0) {
-                    this.localPlayer.yawOffset = e.movementX > 0 ? 0.35 : -0.35;
-                }
+                this.localPlayer.pitch = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, this.localPlayer.pitch));
 
                 this.crosshairOffset.x = 0;
                 this.crosshairOffset.y = 0;
@@ -258,12 +244,11 @@ const Game = {
         });
     },
 
-    // --- INTERACCIÓN DE TALA Y MINADO CON VERIFICACIÓN DE DISTANCIA ---
     handleBuildClick(e) {
-        if (e.button !== 0) return; // Solo clic izquierdo
+        if (e.button !== 0) return; 
 
         const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2(0, 0); // Centro de la pantalla (mira)
+        const mouse = new THREE.Vector2(0, 0); 
 
         raycaster.setFromCamera(mouse, this.camera);
         
@@ -297,7 +282,6 @@ const Game = {
                     if (typeof InventoryModule !== 'undefined') {
                         InventoryModule.addItem('wood', amount);
                     }
-                    console.log(`Madera recolectada: ${amount}`);
                 } 
                 else if (typeof targetEntity.mine === 'function' && targetEntity.isReady) {
                     const gainedStone = targetEntity.mine();
@@ -305,13 +289,11 @@ const Game = {
                     if (gainedStone > 0 && typeof InventoryModule !== 'undefined') {
                         InventoryModule.addItem('stone', gainedStone);
                     }
-                    console.log(`Piedra recolectada: ${gainedStone}`);
                 }
             }
         }
     },
 
-    // 🌟 Colisiones robustas y estrictas para evitar que el jugador traspase árboles y piedras
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -332,10 +314,10 @@ const Game = {
             if (!obsPos) continue;
 
             const nextDist = nextPos.distanceTo(obsPos);
-            const obstacleRadius = (obs.radius || 0.15) + 0.12; // Margen de bloqueo sólido
+            const obstacleRadius = (obs.radius || 0.15) + 0.12;
 
             if (nextDist < (playerRadius + obstacleRadius)) {
-                return true; // Bloquea el movimiento impidiendo traspasarlo
+                return true; 
             }
         }
         return false;
@@ -430,17 +412,20 @@ const Game = {
 
             const rotMatrix = new THREE.Matrix4().makeBasis(right, normal, p.forward.clone().negate());
             p.mesh.quaternion.setFromRotationMatrix(rotMatrix);
+            
+            // Ocultar el avatar en primera persona, visible en tercera y RTS
             p.mesh.visible = (this.cameraMode !== 'first');
 
             if ((moveForward !== 0 || moveSide !== 0 || p.altitude > 0) && this.socket) {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARA TERCERA PERSONA (Over-the-shoulder lateral estricto y compacto) ---
+            // --- GESTIÓN DE CÁMARAS SEPARADAS Y CORREGIDAS ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
-                const eyeHeight = 0.35;
+                // 🌟 Primera persona real tipo Shooter: cámara en los ojos, ocultando el avatar
+                const eyeHeight = 0.38;
                 const eyePosition = p.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
                 this.camera.position.copy(eyePosition);
 
@@ -450,15 +435,14 @@ const Game = {
                 this.camera.lookAt(targetLookAt);
 
             } else if (this.cameraMode === 'third') {
-                const baseDistance = 1.6; // Distancia cercana al cuerpo
+                // 🌟 Tercera persona: Vista Over-the-shoulder lateral y compacta
+                const baseDistance = 1.6;
                 const baseHeight = 0.6;
-
-                // Movimiento vertical adelante/atrás ajusta sutilmente la altura sin barridos circulares
                 const pitchOffset = Math.sin(p.pitch) * 0.25;
 
                 let camPos = p.position.clone()
                     .add(normal.clone().multiplyScalar(baseHeight + pitchOffset))
-                    .add(right.clone().multiplyScalar(p.yawOffset)); // Posición lateral fija al hombro
+                    .add(right.clone().multiplyScalar(p.yawOffset));
 
                 const camNormal = camPos.clone().normalize();
                 if (camPos.length() < R + 0.3) {
@@ -466,21 +450,28 @@ const Game = {
                 }
 
                 this.camera.position.copy(camPos);
-
-                // Focalización directa hacia adelante del personaje
                 const lookTarget = p.position.clone().add(normal.clone().multiplyScalar(0.3)).add(p.forward.clone().multiplyScalar(2.0));
                 this.camera.lookAt(lookTarget);
 
             } else if (this.cameraMode === 'rts') {
-                const rtsHeight = 3.0;
-                const rtsBack = 1.8;
-                const camPos = p.position.clone()
+                // 🌟 Modo Warcraft / RTS: Vista cenital elevada limitando la movilidad más abajo de los pies (mirando al suelo/pies del personaje)
+                const rtsHeight = 3.5;
+                const rtsBack = 0.8;
+                
+                let camPos = p.position.clone()
                     .add(normal.clone().multiplyScalar(rtsHeight))
                     .sub(p.forward.clone().multiplyScalar(rtsBack));
 
+                const camNormal = camPos.clone().normalize();
+                if (camPos.length() < R + 0.3) {
+                    camPos.copy(camNormal.multiplyScalar(R + 0.3));
+                }
+
                 this.camera.position.copy(camPos);
-                const targetLookAt = p.position.clone().add(p.forward.clone().multiplyScalar(2.0));
-                this.camera.lookAt(targetLookAt);
+                
+                // Focalización limitada abajo de los pies / base del personaje
+                const footTarget = p.position.clone().add(normal.clone().multiplyScalar(0.05));
+                this.camera.lookAt(footTarget);
             }
         }
 
