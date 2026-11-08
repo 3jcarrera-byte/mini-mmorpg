@@ -15,13 +15,7 @@ const Game = {
         forward: new THREE.Vector3(0, 0, -1), 
         pitch: 0,
         weaponRange: 15.0,
-        radius: 0.08, // Radio físico compacto ajustado al mínimo
-        // 🌟 Contenedor / Bolso de inventario integrado
-        inventory: {
-            wood: 100,
-            stone: 0,
-            maxSlots: 20
-        }
+        radius: 0.08 // Radio físico compacto ajustado al mínimo
     },
     remotePlayers: {},
     keys: {},
@@ -101,6 +95,11 @@ const Game = {
         if (hudName) hudName.innerText = `${this.localPlayer.name} (Lv.${this.localPlayer.level})`;
 
         this.createShooterCrosshair();
+
+        // 🌟 Inicializar el Módulo de Inventario / Bolso Independiente
+        if (typeof InventoryModule !== 'undefined' && typeof InventoryModule.init === 'function') {
+            InventoryModule.init();
+        }
 
         // Eventos de teclado
         window.addEventListener('keydown', e => {
@@ -230,7 +229,9 @@ const Game = {
         this.socket = io();
         this.socket.on('initWorld', (data) => {
             const woodEl = document.getElementById('ui-wood');
-            if (woodEl) woodEl.innerText = this.localPlayer.inventory.wood;
+            if (woodEl && typeof InventoryModule !== 'undefined') {
+                woodEl.innerText = InventoryModule.getData().wood;
+            }
         });
     },
 
@@ -267,15 +268,19 @@ const Game = {
 
                 if (typeof targetEntity.chopDown === 'function' && targetEntity.state === 'adult') {
                     targetEntity.chopDown();
-                    this.localPlayer.inventory.wood += targetEntity.resourceAmount;
                     
-                    const woodEl = document.getElementById('ui-wood');
-                    if (woodEl) woodEl.innerText = this.localPlayer.inventory.wood;
+                    // 🌟 Delega la adición de madera al Módulo de Inventario
+                    if (typeof InventoryModule !== 'undefined') {
+                        InventoryModule.addItem('wood', targetEntity.resourceAmount);
+                    }
                 } 
                 else if (typeof targetEntity.mine === 'function' && targetEntity.health > 0) {
                     const gainedStone = targetEntity.mine();
-                    this.localPlayer.inventory.stone += gainedStone;
-                    console.log(`Piedra añadida al bolso: ${gainedStone}. Total piedra: ${this.localPlayer.inventory.stone}`);
+                    
+                    // 🌟 Delega la adición de piedra al Módulo de Inventario
+                    if (typeof InventoryModule !== 'undefined') {
+                        InventoryModule.addItem('stone', gainedStone);
+                    }
                 }
             }
         }
