@@ -39,7 +39,7 @@ const WorldModule = (() => {
             createOceanLayer(scene, worldConfig);
         }
 
-        // Crear la capa atmosférica (Techo atmosférico / Capa de ozono)
+        // Crear la capa atmosférica gigante (Radio * 5.0)
         createAtmosphereLayer(scene, worldConfig);
 
         // Crear cuerpos celestes (Estrella y Luna)
@@ -111,22 +111,20 @@ const WorldModule = (() => {
         scene.add(oceanMesh);
     }
 
-    // Crear la esfera atmosférica (Techo del planeta / Capa de ozono interactiva con la luz solar)
+    // Crear la esfera atmosférica gigantesca (Radio * 5.0)
     function createAtmosphereLayer(scene, worldConfig) {
-        const atmosphereRadius = currentRadius * 5.0; // Ligeramente flotando sobre la superficie
+        const atmosphereRadius = currentRadius * 5.0; // Restaurado al valor que preferías
         const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
 
-        const atmosColor = worldConfig.atmosphereColor || 0x75bbf9;
+        const atmosColor = worldConfig.atmosphereColor || 0x5599ff;
 
         const atmosphereMat = new THREE.MeshStandardMaterial({
             color: atmosColor,
-            roughness: 1.0,
-            metalness: 0.0,
+            roughness: 0.9,
+            metalness: 0.1,
             transparent: true,
-            opacity: 0.25,
-            blending: THREE.AdditiveBlending,
-            side: THREE.DoubleSide,
-            depthWrite: false
+            opacity: 0.75,
+            side: THREE.BackSide // Renderizado interno para ver el cielo desde dentro de la esfera
         });
 
         atmosphereMesh = new THREE.Mesh(atmosphereGeo, atmosphereMat);
@@ -231,9 +229,9 @@ const WorldModule = (() => {
             oceanMesh.rotation.x += 0.0002;
         }
 
-        // Deriva atmosférica independiente para dar dinamismo al techo de nubes/ozono
+        // Deriva atmosférica independiente para dar dinamismo a la gran cúpula de cielo
         if (atmosphereMesh) {
-            atmosphereMesh.rotation.y += 0.0004;
+            atmosphereMesh.rotation.y += 0.0002;
         }
 
         // Rotación de la órbita de los cuerpos celestes (Sol / Luna)
