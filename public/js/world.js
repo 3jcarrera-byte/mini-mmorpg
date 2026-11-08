@@ -122,17 +122,21 @@ const WorldModule = (() => {
     }
 
     function createAtmosphereLayer(config) {
-        // Fórmula de grosor dinámico amortiguada con BackSide para evitar pantalla negra en mundos colosales
+        // Fórmula de grosor dinámico optimizada para un halo atmosférico brillante y difuso tipo rim-lighting
         const targetThickness = 4.0 * Math.sqrt(4.0 / currentRadius);
         const atmosphereRadius = currentRadius + targetThickness;
 
         const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
-        const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.45;
+        const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.35;
 
-        const atmosphereMat = new THREE.MeshBasicMaterial({
+        const atmosphereMat = new THREE.MeshStandardMaterial({
             color: config.atmosphereColor || 0x87ceeb,
+            emissive: config.atmosphereColor || 0x87ceeb,
+            emissiveIntensity: 0.35,
             transparent: true,
-            opacity: density,
+            opacity: density * 0.75,
+            roughness: 1.0,
+            metalness: 0.0,
             side: THREE.BackSide, 
             depthWrite: false     
         });
