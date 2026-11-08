@@ -244,9 +244,14 @@ const Game = {
         });
     },
 
-    // --- INTERACCIÓN DE TALA Y MINADO CON RANGO 2.8 PARA COMPENSAR LA CURVATURA ESFÉRICA ---
+    // --- INTERACCIÓN DE TALA Y MINADO CON ACTUALIZACIÓN DE MATRICES Y RANGO 2.8 ---
     handleBuildClick(e) {
         if (e.button !== 0) return; 
+
+        // 🌟 Forzar actualización de matrices del mundo para corregir el desfase de raycasting por la rotación
+        if (this.scene) {
+            this.scene.updateMatrixWorld(true);
+        }
 
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2(0, 0); 
@@ -275,7 +280,6 @@ const Game = {
             }
 
             if (targetEntity) {
-                // 🌟 Umbral compensado a 2.8 para resolver el fallo de curvatura en el planeta esférico
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
                 if (distanceToTarget > 2.8) {
                     console.log("Estás demasiado lejos del objeto.");
@@ -301,6 +305,7 @@ const Game = {
         }
     },
 
+    // 🌟 Colisiones sincronizadas aplicando la rotación actual del planeta (planetMesh.rotation.y) a los obstáculos
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -314,11 +319,16 @@ const Game = {
         if (!obstacles || obstacles.length === 0) return false;
 
         const playerRadius = this.localPlayer.radius;
+        const planetRotationY = (typeof WorldModule.getPlanetRotationY === 'function') ? WorldModule.getPlanetRotationY() : 0;
 
         for (let i = 0; i < obstacles.length; i++) {
             const obs = obstacles[i];
-            const obsPos = obs.position || obs; 
-            if (!obsPos) continue;
+            const basePos = obs.position || obs; 
+            if (!basePos) continue;
+
+            // Clonar y rotar la posición del obstáculo en el eje Y según la rotación actual del planeta
+            const obsPos = basePos.clone();
+            obsPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationY);
 
             const nextDist = nextPos.distanceTo(obsPos);
             const obstacleRadius = obs.radius || 0.08;
