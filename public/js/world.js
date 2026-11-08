@@ -19,7 +19,13 @@ const WorldModule = (() => {
 
         // Cargar configuración desde PLANET_TYPES
         const config = window.PLANET_TYPES[planetTypeKey] || window.PLANET_TYPES.TEMPERATE_FOREST;
-        currentRadius = config.radius || 5;
+        
+        // Si el radio es un rango, tomamos el valor medio o el primero, de lo contrario usamos config.radius o 5
+        if (Array.isArray(config.radiusRange)) {
+            currentRadius = (config.radiusRange[0] + config.radiusRange[1]) / 2;
+        } else {
+            currentRadius = config.radius || 5;
+        }
 
         const planetGeo = new THREE.SphereGeometry(currentRadius, 32, 32);
         applyProceduralBiomesAndElevation(planetGeo, currentRadius, config);
@@ -42,7 +48,7 @@ const WorldModule = (() => {
 
         createAtmosphereLayer(scene, config);
 
-        generateFeatures(scene, planetMesh, config.treeCount || 40, config.rockCount || 20);
+        generateFeatures(scene, planetMesh, config.resources || config.treeCount || 40, config.rockCount || 20);
         
         return planetMesh;
     }
@@ -90,7 +96,7 @@ const WorldModule = (() => {
     }
 
     function createOceanLayer(scene, config) {
-        const oceanRadius = currentRadius * (config.oceanLevel || 0.96);
+        const oceanRadius = currentRadius * (config.oceanLevel || 0.95);
         const oceanGeo = new THREE.SphereGeometry(oceanRadius, 32, 32);
         const isMagma = config.oceanColor === 0x3b0000 || config.name?.includes("Volcánico");
 
@@ -110,17 +116,19 @@ const WorldModule = (() => {
     }
 
     function createAtmosphereLayer(scene, config) {
-        // Capa de ozono rasante y cercana a la superficie (radio ligeramente superior)
-        const atmosphereRadius = currentRadius * 1.05; 
+        // CORRECCIÓN VISUAL: Capa envolvente grande estilo cúpula atmosférica con BackSide 
+        // para que se vea perfectamente desde la superficie sin quedar invisible u oculta.
+        const atmosphereRadius = currentRadius * 1.8; 
         const atmosphereGeo = new THREE.SphereGeometry(atmosphereRadius, 32, 32);
         
-        const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.45;
+        const density = config.ozoneDensity !== undefined ? config.ozoneDensity : 0.55;
 
         const atmosphereMat = new THREE.MeshBasicMaterial({
-            color: config.atmosphereColor || 0x5599ff,
+            color: config.atmosphereColor || 0x87ceeb,
             transparent: true,
             opacity: density,
-            side: THREE.FrontSide
+            side: THREE.BackSide,
+            depthWrite: false
         });
 
         atmosphereMesh = new THREE.Mesh(atmosphereGeo, atmosphereMat);
@@ -128,8 +136,22 @@ const WorldModule = (() => {
         planetMesh.add(atmosphereMesh);
     }
 
-    function generateFeatures(scene, containerMesh, trees, rocks) {
+    function generateFeatures(scene, containerMesh, resourcesOrTrees, rocksCount) {
         const generatedPositions = [];
+        let trees = 40;
+        let rocks = 20;
+
+        // Soporte dual para la estructura nueva de recursos de worldsConfig o conteos directos
+        if (Array.isArray(resourcesOrTrees)) {
+            resourcesOrTrees.forEach(res => {
+                if (res.type === 'tree' || res.type === 'frozen_tree') trees = res.density || 40;
+                if (res.type === 'rock' || res.type === 'obsidian_rock') rocks = res.density || 25;
+            });
+        } else {
+            trees = resourcesOrTrees || 40;
+            rocks = rocksCount || 20;
+        }
+
         const totalItems = trees + rocks;
 
         for (let i = 0; i < totalItems; i++) {
