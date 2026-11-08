@@ -1,4 +1,4 @@
-// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Sol y Ciclo Lunar
+// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Sol Amarillo Radiante y Ciclo Lunar
 const WorldModule = (() => {
     let planetMesh;
     let sunMesh, moonMesh;
@@ -24,7 +24,7 @@ const WorldModule = (() => {
         planetMesh = new THREE.Mesh(planetGeo, planetMat);
         scene.add(planetMesh);
 
-        // 🌟 CREAR SISTEMA DE ASTROS (SOL Y LUNA) EN LA ESCENA
+        // 🌟 CREAR SISTEMA DE ASTROS CON SOL AMARILLO RADIANTE EN LA ESCENA
         createCelestialBodies(scene);
 
         generateFeatures(planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
@@ -35,15 +35,20 @@ const WorldModule = (() => {
         celestialOrbitGroup = new THREE.Group();
         scene.add(celestialOrbitGroup);
 
-        // 1. Sol Visible (Esfera emisiva brillante)
+        // 1. Sol Visible: Amarillo radiante con fuerte brillo emisivo
         const sunGeo = new THREE.SphereGeometry(0.8, 16, 16);
-        const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffee });
+        const sunMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffea00,          // Amarillo brillante
+            emissive: 0xffcc00,      // Brillo intenso propio
+            emissiveIntensity: 1.2,  // Resplandor vivo
+            roughness: 0.2 
+        });
         sunMesh = new THREE.Mesh(sunGeo, sunMat);
         sunMesh.position.set(20, 10, 20);
         celestialOrbitGroup.add(sunMesh);
 
         // Luz direccional principal anclada al sol para iluminar dinámicamente el planeta
-        const sunLight = new THREE.DirectionalLight(0xfff5b6, 1.4);
+        const sunLight = new THREE.DirectionalLight(0xffea75, 1.5);
         sunLight.position.set(0, 0, 0);
         sunMesh.add(sunLight);
 
