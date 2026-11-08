@@ -16,7 +16,7 @@ const Game = {
         pitch: 0,
         yawOffset: 0.35, 
         weaponRange: 15.0,
-        radius: 0.12 // 🌟 Reducido para evitar que el jugador se quede atascado en el terreno o bordes de objetos
+        radius: 0.08 // 🌟 Radio físico ultra compacto para evitar atascos en el terreno
     },
     remotePlayers: {},
     keys: {},
@@ -244,7 +244,7 @@ const Game = {
         });
     },
 
-    // --- INTERACCIÓN DE TALA Y MINADO CON REGLA ESTRICTA DE DISTANCIA ---
+    // --- INTERACCIÓN DE TALA Y MINADO CON REGLA ESTRICTA Y CERCANA DE DISTANCIA ---
     handleBuildClick(e) {
         if (e.button !== 0) return; 
 
@@ -270,9 +270,9 @@ const Game = {
             }
 
             if (targetEntity) {
-                // 🌟 Validación estricta de cercanía (máximo 1.8 unidades para evitar recolectar a lo lejos)
+                // 🌟 Regla estricta de cercanía máxima (1.2 unidades para impedir recolección lejana)
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
-                if (distanceToTarget > 1.8) {
+                if (distanceToTarget > 1.2) {
                     console.log("Estás demasiado lejos del objeto.");
                     return;
                 }
@@ -296,7 +296,7 @@ const Game = {
         }
     },
 
-    // 🌟 Colisiones fluidas y limpias que evitan que el jugador se quede atascado en el terreno
+    // 🌟 Colisiones optimizadas sin márgenes exagerados para evitar bloqueos en el terreno
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -317,7 +317,7 @@ const Game = {
             if (!obsPos) continue;
 
             const nextDist = nextPos.distanceTo(obsPos);
-            const obstacleRadius = (obs.radius || 0.15) + 0.05; // Margen optimizado para no atascarse
+            const obstacleRadius = (obs.radius || 0.15) + 0.02; // Margen mínimo para fluidez total
 
             if (nextDist < (playerRadius + obstacleRadius)) {
                 return true; 
@@ -454,9 +454,9 @@ const Game = {
                 this.camera.lookAt(lookTarget);
 
             } else if (this.cameraMode === 'rts') {
-                // 🌟 Modo Warcraft / RTS: Distancia reducida a la mitad (altura y distancia hacia atrás disminuidas)
-                const rtsHeight = 2.4; 
-                const rtsBack = 1.2;   
+                // 🌟 Modo Warcraft / RTS: Altura y distancia reducidas a la mitad exactas para estar cerca del personaje
+                const rtsHeight = 1.2; 
+                const rtsBack = 0.6;   
                 
                 const rtsPitch = Math.max(-0.8, Math.min(0.35, p.pitch));
 
