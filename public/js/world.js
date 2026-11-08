@@ -1,6 +1,8 @@
-// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK)
+// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Sol y Ciclo Lunar
 const WorldModule = (() => {
     let planetMesh;
+    let sunMesh, moonMesh;
+    let celestialOrbitGroup;
     let playerPos = { theta: 0, phi: Math.PI / 4 };
     const planetRadius = 5;
     const structures = [];
@@ -22,8 +24,35 @@ const WorldModule = (() => {
         planetMesh = new THREE.Mesh(planetGeo, planetMat);
         scene.add(planetMesh);
 
+        // 🌟 CREAR SISTEMA DE ASTROS (SOL Y LUNA) EN LA ESCENA
+        createCelestialBodies(scene);
+
         generateFeatures(planetMesh, worldConfig.treeCount || 40, worldConfig.rockCount || 20);
         return planetMesh;
+    }
+
+    function createCelestialBodies(scene) {
+        celestialOrbitGroup = new THREE.Group();
+        scene.add(celestialOrbitGroup);
+
+        // 1. Sol Visible (Esfera emisiva brillante)
+        const sunGeo = new THREE.SphereGeometry(0.8, 16, 16);
+        const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffee });
+        sunMesh = new THREE.Mesh(sunGeo, sunMat);
+        sunMesh.position.set(20, 10, 20);
+        celestialOrbitGroup.add(sunMesh);
+
+        // Luz direccional principal anclada al sol para iluminar dinámicamente el planeta
+        const sunLight = new THREE.DirectionalLight(0xfff5b6, 1.4);
+        sunLight.position.set(0, 0, 0);
+        sunMesh.add(sunLight);
+
+        // 2. Luna (Opuesta al sol para simular ciclo realista)
+        const moonGeo = new THREE.SphereGeometry(0.5, 16, 16);
+        const moonMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.9 });
+        moonMesh = new THREE.Mesh(moonGeo, moonMat);
+        moonMesh.position.set(-20, -10, -20);
+        celestialOrbitGroup.add(moonMesh);
     }
 
     function generateFeatures(containerMesh, trees, rocks) {
@@ -84,7 +113,13 @@ const WorldModule = (() => {
     }
 
     function rotatePlanet() {
-        if (planetMesh) planetMesh.rotation.y += 0.001;
+        if (planetMesh) {
+            planetMesh.rotation.y += 0.001;
+        }
+        // Rotar lentamente el grupo de astros celestes (Sol y Luna)
+        if (celestialOrbitGroup) {
+            celestialOrbitGroup.rotation.y += 0.0002;
+        }
     }
 
     function updateEcosystem(delta, scene, obstaclesList) {
