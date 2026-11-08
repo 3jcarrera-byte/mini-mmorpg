@@ -51,14 +51,14 @@
         <canvas id="characterCanvas" class="cinematic-canvas"></canvas>
 
         <div id="panel-top-name" class="panel-top-name" style="display: none;">
-            <h2 id="char-display-name" style="margin: 0; font-size: 16px;">CLASE: GUERRERO</h2>
+            <h2 id="char-display-name" style="margin: 0; font-size: 16px;">RAZA ALIENÍGENA</h2>
         </div>
 
-        <!-- Flechas de Selección 3D de Clase (Solo en modo creación) -->
+        <!-- Flechas de Selección 3D de Raza Alienígena (Solo en modo creación) -->
         <button id="btn-arrow-left" class="btn-arrow arrow-left">&lt;</button>
         <button id="btn-arrow-right" class="btn-arrow arrow-right">&gt;</button>
 
-        <!-- Panel Derecho Vertical: Atributos de la Clase (Estilo RPG) -->
+        <!-- Panel Derecho Vertical: Atributos de la Raza (Estilo RPG) -->
         <div id="panel-attributes" class="attributes-panel" style="display: none;">
             <h3>ATRIBUTOS</h3>
             <div class="stat-row"><span>Fuerza:</span> <span id="stat-str">--</span></div>
@@ -115,13 +115,13 @@
         </div>
     </div>
 
-    <!-- Orden estricto y limpio de scripts: Objetos, Configuraciones, Módulos de Entorno, Lógica y Aplicación -->
+    <!-- Orden estricto y limpio de scripts corrigiendo la carga de galaxy.js para evitar ReferenceError -->
     <script src="js/objects/tree.js"></script>
     <script src="js/objects/rock.js"></script>
     <script src="js/objects/sun.js"></script>
     <script src="js/objects/weatherParticles.js"></script>
     
-    <script src="js/worldsConfig.js"></script>
+    <script src="js/galaxy.js"></script>
     <script src="js/world.js"></script>
     
     <script src="js/character.js"></script>
