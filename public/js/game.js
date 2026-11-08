@@ -4,9 +4,9 @@ const Game = {
     localPlayer: { 
         mesh: null, 
         speed: 0.03, 
-        jumpSpeed: 0.04,    
+        jumpSpeed: 0.04,   
         verticalVelocity: 0, 
-        altitude: 0,       
+        altitude: 0,      
         name: 'Héroe', 
         level: 1, 
         classType: 'guerrero', 
@@ -16,7 +16,7 @@ const Game = {
         pitch: 0,
         yawOffset: 0.35, 
         weaponRange: 15.0,
-        radius: 0.08 // Radio físico ultra compacto para evitar atascos en el terreno
+        radius: 0.08 
     },
     remotePlayers: {},
     keys: {},
@@ -244,7 +244,6 @@ const Game = {
         });
     },
 
-    // --- INTERACCIÓN DE TALA Y MINADO CON FILTRADO DE OBJETOS ACTIVOS Y REGLA DE DISTANCIA ---
     handleBuildClick(e) {
         if (e.button !== 0) return; 
 
@@ -253,7 +252,6 @@ const Game = {
 
         raycaster.setFromCamera(mouse, this.camera);
         
-        // 🌟 Filtrar únicamente objetos interactivos que estén activos y visibles (ignora tocones y piedras recogidas)
         const interactiveObjects = WorldModule.getInteractiveObjects().filter(obj => {
             if (!obj.mesh || !obj.mesh.visible) return false;
             if (obj.type === 'tree' && obj.state !== 'adult') return false;
@@ -276,7 +274,6 @@ const Game = {
             }
 
             if (targetEntity) {
-                // 🌟 Validación de cercanía equilibrada (2.0 unidades)
                 const distanceToTarget = this.localPlayer.position.distanceTo(targetEntity.mesh.position);
                 if (distanceToTarget > 2.0) {
                     console.log("Estás demasiado lejos del objeto.");
@@ -302,7 +299,6 @@ const Game = {
         }
     },
 
-    // 🌟 Colisiones optimizadas sin atascos en desniveles
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -428,7 +424,7 @@ const Game = {
                 this.socket.emit('playerMove', { x: p.position.x, y: p.position.y, z: p.position.z });
             }
 
-            // --- GESTIÓN DE CÁMARAS OPTIMIZADAS ---
+            // --- GESTIÓN DE CÁMARAS ---
             this.camera.up.copy(normal);
 
             if (this.cameraMode === 'first') {
@@ -452,3 +448,39 @@ const Game = {
 
                 const camNormal = camPos.clone().normalize();
                 if (camPos.length() < R + 0.3) {
+                    camPos.copy(camNormal.multiplyScalar(R + 0.3));
+                }
+
+                this.camera.position.copy(camPos);
+                const lookTarget = p.position.clone().add(normal.clone().multiplyScalar(0.3)).add(p.forward.clone().multiplyScalar(2.0));
+                this.camera.lookAt(lookTarget);
+
+            } else if (this.cameraMode === 'rts') {
+                const rtsHeight = 3.0; 
+                const rtsBack = 1.8;   
+                
+                const rtsPitch = Math.max(-0.8, Math.min(0.35, p.pitch));
+
+                let camPos = p.position.clone()
+                    .add(normal.clone().multiplyScalar(rtsHeight))
+                    .sub(p.forward.clone().multiplyScalar(rtsBack));
+
+                const camNormal = camPos.clone().normalize();
+                if (camPos.length() < R + 0.3) {
+                    camPos.copy(camNormal.multiplyScalar(R + 0.3));
+                }
+
+                this.camera.position.copy(camPos);
+                
+                const lookDir = p.forward.clone();
+                lookDir.applyAxisAngle(right, rtsPitch);
+                const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.2)).add(lookDir.multiplyScalar(p.weaponRange));
+                this.camera.lookAt(targetLookAt);
+            }
+        }
+
+        this.renderer.render(this.scene, this.camera);
+    }
+};
+
+window.GameModule = Game;
