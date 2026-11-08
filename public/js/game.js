@@ -244,7 +244,6 @@ const Game = {
         });
     },
 
-    // 🌟 2. Corrección del desfase de clic (Raycasting) sobre objetos en movimiento
     handleBuildClick(e) {
         if (e.button !== 0) return; 
 
@@ -260,7 +259,6 @@ const Game = {
             return true;
         });
 
-        // Forzar actualización de las matrices globales de las mallas interactivas antes del raycast
         interactiveObjects.forEach(obj => {
             if (obj.mesh) {
                 obj.mesh.updateMatrixWorld(true);
@@ -307,7 +305,6 @@ const Game = {
         }
     },
 
-    // 🌟 1. Sincronización del sistema de colisiones con el giro del planeta
     checkCollision(nextPos, currentAltitude) {
         if (typeof WorldModule === 'undefined') return false;
         
@@ -328,7 +325,6 @@ const Game = {
             const basePos = obs.position || obs; 
             if (!basePos) continue;
 
-            // Clonar la posición base y aplicar vectorialmente la rotación actual del planeta
             const rotatedObsPos = basePos.clone();
             rotatedObsPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), currentPlanetRotation);
 
@@ -473,7 +469,8 @@ const Game = {
                 const rtsHeight = 3.0; 
                 const rtsBack = 1.8;   
                 
-                const rtsPitch = Math.max(-1.1, Math.min(0.18, p.pitch));
+                // 🌟 Límite inferior extendido hasta los pies (coincidiendo con tu línea roja) y superior reducido a la mitad
+                const rtsPitch = Math.max(-0.55, Math.min(0.08, p.pitch));
 
                 let camPos = p.position.clone()
                     .add(normal.clone().multiplyScalar(rtsHeight))
@@ -488,7 +485,7 @@ const Game = {
                 
                 const lookDir = p.forward.clone();
                 lookDir.applyAxisAngle(right, rtsPitch);
-                const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.05)).add(lookDir.multiplyScalar(p.weaponRange));
+                const targetLookAt = p.position.clone().add(normal.clone().multiplyScalar(0.02)).add(lookDir.multiplyScalar(p.weaponRange));
                 this.camera.lookAt(targetLookAt);
             }
         }
