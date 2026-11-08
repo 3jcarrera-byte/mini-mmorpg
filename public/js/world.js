@@ -1,4 +1,4 @@
-// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Superficie Exacta, Colisiones Universales y Árboles Perfectos
+// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Radios de Colisión Ajustados al Tamaño Real
 const WorldModule = (() => {
     let planetMesh;
     let sunMesh, moonMesh;
@@ -66,7 +66,6 @@ const WorldModule = (() => {
                 const theta = u * 2.0 * Math.PI;
                 const phi = Math.acos(2.0 * v - 1.0);
 
-                // Posicionamiento exacto sobre el radio exterior de la esfera del planeta
                 const x = planetRadius * Math.sin(phi) * Math.cos(theta);
                 const y = planetRadius * Math.sin(phi) * Math.sin(theta);
                 const z = planetRadius * Math.cos(phi);
@@ -88,7 +87,6 @@ const WorldModule = (() => {
             let featureData;
 
             if (isTree) {
-                // Generador integrado de árboles garantizado (soluciona cualquier problema externo de TreeObject)
                 featureData = createOptimizedTree(position);
             } else {
                 featureData = createOptimizedRock(position);
@@ -106,7 +104,7 @@ const WorldModule = (() => {
         }
     }
 
-    // 🌟 Árboles con colisión universal y alineación milimétrica a la superficie
+    // 🌟 Árbol con radio físico de colisión ajustado al tronco real (0.08)
     function createOptimizedTree(position) {
         const group = new THREE.Group();
         group.position.copy(position);
@@ -117,14 +115,12 @@ const WorldModule = (() => {
         const isSapling = Math.random() < 0.4;
         const scaleFactor = isSapling ? 0.6 : 1.0;
 
-        // Tronco perfectamente asentado en la base (y = 0.2 * scaleFactor)
         const trunkGeo = new THREE.CylinderGeometry(0.04 * scaleFactor, 0.06 * scaleFactor, 0.4 * scaleFactor, 6);
         const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9 });
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
         trunk.position.y = 0.2 * scaleFactor;
         group.add(trunk);
 
-        // Follaje
         const leavesGeo = new THREE.ConeGeometry(0.25 * scaleFactor, 0.6 * scaleFactor, 6);
         const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d8a4e, roughness: 0.7 });
         const leaves = new THREE.Mesh(leavesGeo, leavesMat);
@@ -135,11 +131,11 @@ const WorldModule = (() => {
             type: 'tree',
             mesh: group,
             state: 'adult', 
-            resourceAmount: isSapling ? 5 : 15, // Los pequeños dan menos madera, pero igual bloquean
+            resourceAmount: isSapling ? 5 : 15,
             respawnTimer: 0,
-            radius: 0.22, // Radio de colisión sólido universal
+            radius: 0.08, // 🌟 Ajustado al tronco real para evitar falsos bloqueos
             height: 0.6 * scaleFactor,
-            collider: { position: position, radius: 0.22, height: 0.6 * scaleFactor },
+            collider: { position: position, radius: 0.08, height: 0.6 * scaleFactor },
             chopDown() {
                 this.state = 'stump';
                 this.resourceAmount = 0;
@@ -164,7 +160,7 @@ const WorldModule = (() => {
         return treeEntity;
     }
 
-    // 🌟 Piedras optimizadas, pequeñas y con colisión perfecta
+    // 🌟 Piedra con radio físico de colisión ajustado al tamaño real (0.10)
     function createOptimizedRock(position) {
         const group = new THREE.Group();
         group.position.copy(position);
@@ -175,8 +171,8 @@ const WorldModule = (() => {
         const rockGeo = new THREE.DodecahedronGeometry(0.35, 1);
         const rockMat = new THREE.MeshStandardMaterial({ color: 0x808588, roughness: 0.8, flatShading: true });
         const mesh = new THREE.Mesh(rockGeo, rockMat);
-        mesh.scale.set(0.2, 0.2, 0.2); // 80% más pequeña
-        mesh.position.y = 0.0; // Pegada a la tierra
+        mesh.scale.set(0.2, 0.2, 0.2); 
+        mesh.position.y = 0.0; 
         group.add(mesh);
 
         const rockEntity = {
@@ -185,9 +181,9 @@ const WorldModule = (() => {
             isReady: true,
             resourceAmount: 10,
             respawnTimer: 0,
-            radius: 0.25, 
+            radius: 0.10, // 🌟 Ajustado al tamaño de la piedra
             height: 0.2,
-            collider: { position: position, radius: 0.25, height: 0.2 },
+            collider: { position: position, radius: 0.10, height: 0.2 },
             mine() {
                 if (!this.isReady) return 0;
                 this.isReady = false;
