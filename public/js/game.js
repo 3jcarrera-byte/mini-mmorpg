@@ -187,7 +187,7 @@ const Game = {
         this.socket.on('initWorld', (data) => {
             const woodEl = document.getElementById('ui-wood');
             if (woodEl && typeof InventoryModule !== 'undefined') {
-                woodEl.innerText = InventoryModule.getTotalItemCount('wood');
+                woodEl.innerText = InventoryModule.getData().wood;
             }
         });
     },
@@ -200,7 +200,6 @@ const Game = {
 
         raycaster.setFromCamera(mouse, this.camera);
         
-        // Filtramos objetos interactivos válidos (árboles vivos/creciendo o rocas listas)
         const interactiveObjects = WorldModule.getInteractiveObjects().filter(obj => {
             if (!obj.mesh || !obj.mesh.visible) return false;
             if (obj.type === 'tree' && obj.state === 'stump') return false;
@@ -229,10 +228,10 @@ const Game = {
             }
         }
 
-        // Respaldo por proximidad con distancia estricta de 1.3
+        // 🌟 Respaldo por proximidad ajustado estrictamente a 0.6 de distancia
         if (!targetEntity) {
             let closestObj = null;
-            let minDist = 1.3; 
+            let minDist = 0.6; 
 
             interactiveObjects.forEach(obj => {
                 const worldPos = new THREE.Vector3();
@@ -252,13 +251,12 @@ const Game = {
             targetEntity.mesh.getWorldPosition(worldPos);
             const distanceToTarget = this.localPlayer.position.distanceTo(worldPos);
             
-            // Distancia de recolección estricta máxima de 1.3
-            if (distanceToTarget > 1.3) {
+            // 🌟 Distancia de recolección estricta máxima de 0.6
+            if (distanceToTarget > 0.6) {
                 console.log("Estás demasiado lejos del objeto.");
                 return;
             }
 
-            // 🌟 Permitir talar árboles tanto en estado adult como sapling (creciendo)
             if (typeof targetEntity.chopDown === 'function' && targetEntity.state !== 'stump') {
                 const amount = targetEntity.resourceAmount || 1;
                 targetEntity.chopDown();
@@ -294,7 +292,6 @@ const Game = {
 
         for (let i = 0; i < obstacles.length; i++) {
             const obs = obstacles[i];
-            // 🌟 Omitir colisionadores inactivos (cuando el árbol/roca está cortado, invisible o reponiéndose)
             if (obs.active === false) continue;
 
             const basePos = obs.position || obs; 
