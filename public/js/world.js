@@ -1,4 +1,4 @@
-// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Sol Amarillo Radiante, Ciclo Lunar y Piedras Optimizadas
+// Módulo de Mundo Esférico (Estilo Pequeño Planeta / Rust / ARK) con Sol Amarillo Radiante, Ciclo Lunar y Piedras Optimizadas e Interactuables
 const WorldModule = (() => {
     let planetMesh;
     let sunMesh, moonMesh;
@@ -101,7 +101,7 @@ const WorldModule = (() => {
                     featureData = window.TreeObject.create(position, randomState, randomProgress);
                 }
             } else {
-                // 🌟 Creación de Piedras con 80% de reducción (escala 0.2) y lógica de dos estados
+                // 🌟 Creación de Piedras con 80% de reducción y radio de impacto optimizado para minado perfecto
                 featureData = createOptimizedRock(position);
             }
 
@@ -115,7 +115,7 @@ const WorldModule = (() => {
         }
     }
 
-    // 🌟 Generador optimizado de Piedras (80% más pequeñas y ocultas al recogerse)
+    // 🌟 Generador optimizado de Piedras (80% más pequeñas, ocultas al recogerse y fáciles de minar)
     function createOptimizedRock(position) {
         const group = new THREE.Group();
         group.position.copy(position);
@@ -137,21 +137,21 @@ const WorldModule = (() => {
             isReady: true, // Estado 1: Lista para recoger
             resourceAmount: 10,
             respawnTimer: 0,
-            radius: 0.08,
-            height: 0.12,
+            radius: 0.12,  // Radio optimizado para que el raycast y la distancia detecten el clic de minado sin fallo
+            height: 0.15,
             mine() {
                 if (!this.isReady) return 0;
                 this.isReady = false;
                 this.respawnTimer = 20.0; // 20 segundos de reposición
                 
                 // Ocultar por completo la piedra (no se muestra estado recogido)
-                this.mesh.visible = false;
+                mesh.visible = false;
                 return this.resourceAmount;
             },
             respawn() {
                 this.isReady = true;
                 // Hacerla visible nuevamente en su tamaño completo
-                this.mesh.visible = true;
+                mesh.visible = true;
             },
             update(delta) {
                 if (!this.isReady) {
