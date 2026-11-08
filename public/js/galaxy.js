@@ -136,7 +136,8 @@ const GalaxyModule = (() => {
             const planetData = {
                 id: currentPlanetId,
                 systemId: systemId,
-                type: pType,
+                type: pType,            // Requisito interno para world.js
+                planetTypeKey: pType,   // Requisito de mapeo seguro para game.js
                 radius: radius,
                 orbitRadius: orbitalDistance,
                 orbitalSpeed: 0.0001,
