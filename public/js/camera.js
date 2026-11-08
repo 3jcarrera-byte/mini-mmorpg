@@ -2,7 +2,15 @@
 
 const CameraModule = (() => {
     function updateCamera(camera, player, cameraMode, planetRadius) {
-        const normal = player.position.clone().normalize();
+        // Obtener el centro global real del planeta actual desde WorldModule
+        const planetMesh = (typeof WorldModule !== 'undefined' && typeof WorldModule.getPlanetMesh === 'function') ? WorldModule.getPlanetMesh() : null;
+        const planetGlobalCenter = new THREE.Vector3(0, 0, 0);
+        if (planetMesh) {
+            planetMesh.getWorldPosition(planetGlobalCenter);
+        }
+
+        // Vector normal preciso desde el centro del planeta actual hasta la posición del jugador
+        const normal = player.position.clone().sub(planetGlobalCenter).normalize();
         const right = new THREE.Vector3().crossVectors(player.forward, normal).normalize();
         const R = planetRadius;
 
@@ -28,26 +36,20 @@ const CameraModule = (() => {
             const codmPitch = Math.max(-0.6, Math.min(0.6, player.pitch));
             const pitchOffset = Math.sin(codmPitch) * 0.2;
 
-            // Posicionamiento relativo basado estrictamente en el vector normal de la superficie del planeta
+            // Posicionamiento calculado de forma relativa al centro móvil del planeta activo
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(baseHeight + pitchOffset))
                 .sub(player.forward.clone().multiplyScalar(baseDistance))
                 .add(right.clone().multiplyScalar(codmYawOffset));
 
-            // Blindaje estricto: Asegurar que la cámara nunca baje del radio del planeta + margen de seguridad
-            const distFromCenter = camPos.length();
+            // Blindaje de seguridad esférico respecto al centro global del planeta
             const minAllowedRadius = R + 0.35;
-            if (distFromCenter < minAllowedRadius) {
-                camPos = normal.clone().multiplyScalar(minAllowedRadius)
-                    .add(player.position.clone().sub(normal.clone().multiplyScalar(player.position.dot(normal))).normalize().multiplyScalar(camPos.clone().sub(normal.clone().multiplyScalar(camPos.dot(normal))).length()));
-                // Fallback directo normalizado si se acerca de más al núcleo
-                if (camPos.length() < minAllowedRadius) {
-                    camPos = normal.clone().multiplyScalar(minAllowedRadius).add(player.position.clone().sub(normal.clone().multiplyScalar(R)).normalize().multiplyScalar(0.5));
-                }
+            const vectorFromPlanetCenter = camPos.clone().sub(planetGlobalCenter);
+            if (vectorFromPlanetCenter.length() < minAllowedRadius) {
+                vectorFromPlanetCenter.normalize().multiplyScalar(minAllowedRadius);
+                camPos = planetGlobalCenter.clone().add(vectorFromPlanetCenter);
             }
 
-            // Corrección de seguridad radial absoluta para evitar cualquier colapso visual
-            camPos.normalize().multiplyScalar(Math.max(R + 0.35, camPos.length()));
             camera.position.copy(camPos);
             
             const lookDir = player.forward.clone();
@@ -66,10 +68,14 @@ const CameraModule = (() => {
                 .add(normal.clone().multiplyScalar(rtsHeight))
                 .sub(player.forward.clone().multiplyScalar(rtsBack));
 
-            // Blindaje estricto para RTS
+            // Blindaje estricto para la vista cenital/RTS
             const minAllowedRadiusRTS = R + 0.5;
-            camPos.normalize().multiplyScalar(Math.max(minAllowedRadiusRTS, camPos.length()));
-            
+            const vectorFromPlanetCenterRTS = camPos.clone().sub(planetGlobalCenter);
+            if (vectorFromPlanetCenterRTS.length() < minAllowedRadiusRTS) {
+                vectorFromPlanetCenterRTS.normalize().multiplyScalar(minAllowedRadiusRTS);
+                camPos = planetGlobalCenter.clone().add(vectorFromPlanetCenterRTS);
+            }
+
             camera.position.copy(camPos);
             
             const lookDir = player.forward.clone();
