@@ -25,7 +25,7 @@ const CameraModule = (() => {
 
             // Restringir el pitch en cámara 2 para que el límite inferior no baje demasiado de golpe
             // Ajusta -0.3 (límite inferior) y 0.5 (límite superior) según prefieras
-            const codmPitch = Math.max(-0.1, Math.min(0.5, player.pitch));
+            const codmPitch = Math.max(-0.2, Math.min(0.5, player.pitch));
             const pitchOffset = Math.sin(codmPitch) * 0.2;
 
             let camPos = player.position.clone()
@@ -51,7 +51,7 @@ const CameraModule = (() => {
             const rtsBack = 2.5;   
             
             // Límite superior ajustado: El segundo valor (0.2 o 0.15) frena hasta dónde puede subir la mirilla hacia arriba
-            const rtsPitch = Math.max(-0.8, Math.min(0.02, player.pitch));
+            const rtsPitch = Math.max(-0.8, Math.min(0.01, player.pitch));
 
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(rtsHeight))
