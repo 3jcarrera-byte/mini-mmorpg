@@ -28,8 +28,9 @@ const CameraModule = (() => {
             const eyePosition = player.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
             camera.position.copy(eyePosition);
 
+            // Invertido el signo del pitch para que el movimiento vertical del crosshair coincida con el ratón
             const lookDir = viewForward.clone();
-            lookDir.applyAxisAngle(viewRight, player.pitch);
+            lookDir.applyAxisAngle(viewRight, -player.pitch);
             const targetLookAt = eyePosition.clone().add(lookDir.multiplyScalar(player.weaponRange));
             camera.lookAt(targetLookAt);
 
@@ -41,7 +42,7 @@ const CameraModule = (() => {
             const codmPitch = Math.max(-0.6, Math.min(0.6, player.pitch));
             const pitchOffset = Math.sin(codmPitch) * 0.2;
 
-            // Posición de la cámara basada en la vista libre (yawOffset) y no en la dirección del cuerpo
+            // Posición de la cámara basada en la vista libre (yawOffset)
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(baseHeight + pitchOffset))
                 .sub(viewForward.clone().multiplyScalar(baseDistance))
@@ -60,38 +61,33 @@ const CameraModule = (() => {
 
             camera.position.copy(camPos);
             
+            // Invertido el signo de codmPitch para alinear el eje vertical con el ratón
             const lookDir = viewForward.clone();
-            lookDir.applyAxisAngle(viewRight, codmPitch);
+            lookDir.applyAxisAngle(viewRight, -codmPitch);
             const lookTarget = player.position.clone().add(normal.clone().multiplyScalar(0.2)).add(lookDir.multiplyScalar(player.weaponRange));
             camera.lookAt(lookTarget);
 
         } else if (cameraMode === 'rts') {
-            const rtsHeight = 2.8; 
-            const rtsBack = 2.5;   
+            // 🌟 Altura y distancia óptimas y corregidas para vista cenital RTS estable
+            const rtsHeight = 4.5; 
+            const rtsBack = 3.0;   
             
-            const rtsPitch = Math.max(-0.8, Math.min(-0.5, player.pitch));
-
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(rtsHeight))
                 .sub(viewForward.clone().multiplyScalar(rtsBack));
 
-            const minAllowedRadiusRTS = R + 0.5;
+            const minAllowedRadiusRTS = R + 1.0;
             const camVectorFromCenterRTS = camPos.clone().sub(planetCenter);
             if (camVectorFromCenterRTS.length() < minAllowedRadiusRTS) {
                 camVectorFromCenterRTS.normalize().multiplyScalar(minAllowedRadiusRTS);
-                camPos = planetCenter.clone().add(camVectorFromCenterRTS);
-            } else {
-                const currentDistRTS = camVectorFromCenterRTS.length();
-                camVectorFromCenterRTS.normalize().multiplyScalar(Math.max(minAllowedRadiusRTS, currentDistRTS));
                 camPos = planetCenter.clone().add(camVectorFromCenterRTS);
             }
 
             camera.position.copy(camPos);
             
-            const lookDir = viewForward.clone();
-            lookDir.applyAxisAngle(viewRight, rtsPitch);
-            const targetLookAt = player.position.clone().add(normal.clone().multiplyScalar(0.1)).add(lookDir.multiplyScalar(player.weaponRange));
-            camera.lookAt(targetLookAt);
+            // Vista cenital limpia apuntando al jugador
+            const lookTarget = player.position.clone().add(normal.clone().multiplyScalar(0.2));
+            camera.lookAt(lookTarget);
         }
     }
 
