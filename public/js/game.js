@@ -137,6 +137,11 @@ const Game = {
         const hudName = document.getElementById('hud-char-name');
         if (hudName) hudName.innerText = `${this.localPlayer.name} [${this.localPlayer.alienRace.toUpperCase()}] (Lv.${this.localPlayer.level})`;
 
+        if (typeof HudModule !== 'undefined' && typeof HudModule.init === 'function') {
+            HudModule.init();
+            HudModule.updatePlayerInfo(this.localPlayer.name, this.localPlayer.alienRace, this.localPlayer.level);
+        }
+
         if (typeof CrosshairModule !== 'undefined') {
             CrosshairModule.init();
         }
@@ -163,6 +168,15 @@ const Game = {
             const woodEl = document.getElementById('ui-wood');
             if (woodEl && typeof InventoryModule !== 'undefined') {
                 woodEl.innerText = InventoryModule.getData().wood;
+            }
+            if (typeof HudModule !== 'undefined' && typeof InventoryModule !== 'undefined') {
+                HudModule.updateResources(InventoryModule.getData());
+            }
+        });
+
+        this.socket.on('resourceUpdated', (data) => {
+            if (typeof HudModule !== 'undefined') {
+                HudModule.updateResources(data);
             }
         });
     },
@@ -238,6 +252,9 @@ const Game = {
                 
                 if (typeof InventoryModule !== 'undefined') {
                     InventoryModule.addItem('wood', amount);
+                    if (typeof HudModule !== 'undefined') {
+                        HudModule.updateResources(InventoryModule.getData());
+                    }
                 }
 
                 if (this.socket) {
@@ -253,6 +270,9 @@ const Game = {
                 
                 if (gainedStone > 0 && typeof InventoryModule !== 'undefined') {
                     InventoryModule.addItem('stone', gainedStone);
+                    if (typeof HudModule !== 'undefined') {
+                        HudModule.updateResources(InventoryModule.getData());
+                    }
                 }
 
                 if (this.socket) {
