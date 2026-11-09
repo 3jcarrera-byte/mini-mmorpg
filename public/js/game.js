@@ -158,8 +158,7 @@ const Game = {
     handleMouseMove(e) {
         const sensitivity = 0.003;
         this.localPlayer.yawOffset -= e.movementX * sensitivity;
-        // Corregido el signo vertical para que coincida perfectamente con la cámara e invertidos
-        this.localPlayer.pitch += e.movementY * sensitivity;
+        this.localPlayer.pitch -= e.movementY * sensitivity;
         this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
     },
 
@@ -348,10 +347,8 @@ const Game = {
             const planetGlobalCenter = new THREE.Vector3();
             if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
 
-            const planetRotationStep = 0.001;
-            p.position.sub(planetGlobalCenter);
-            p.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), planetRotationStep);
-            p.position.add(planetGlobalCenter);
+            // 🌟 QUITAMOS LA ROTACIÓN AUTOMÁTICA DEL PLANETA SOBRE EL JUGADOR PARA QUE EL SUELO NO SE MUEVA A SUS PIES
+            // (Si el planeta rota visualmente, hazlo solo a nivel de escena/malla del planeta, no aplicando rotación al centro del jugador)
 
             let normal = p.position.clone().sub(planetGlobalCenter).normalize();
 
@@ -361,7 +358,8 @@ const Game = {
 
             const rotMatrixYaw = new THREE.Matrix4().makeRotationAxis(normal, p.yawOffset);
             const viewForward = tangentForward.clone().applyMatrix4(rotMatrixYaw).normalize();
-            const viewRight = tangentRight.clone().applyMatrix4(rotMatrixYaw).normalize();
+            // 🌟 Invertimos viewRight para corregir definitivamente el sentido de A y D
+            const viewRight = tangentRight.clone().applyMatrix4(rotMatrixYaw).normalize().negate();
 
             let moveForward = 0;
             let moveSide = 0;
