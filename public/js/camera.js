@@ -9,9 +9,18 @@ const CameraModule = (() => {
         }
 
         const normal = player.position.clone().sub(planetCenter).normalize();
-        const right = new THREE.Vector3().crossVectors(player.forward, normal).normalize();
-        const R = planetRadius;
+        
+        // Calcular la base tangente estable en función de la normal
+        const refVector = Math.abs(normal.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+        const tangentRight = new THREE.Vector3().crossVectors(normal, refVector).normalize();
+        const tangentForward = new THREE.Vector3().crossVectors(tangentRight, normal).normalize();
 
+        // Aplicar el ángulo de rotación horizontal de la cámara (yawOffset)
+        const rotMatrixYaw = new THREE.Matrix4().makeRotationAxis(normal, player.yawOffset || 0);
+        const viewForward = tangentForward.clone().applyMatrix4(rotMatrixYaw).normalize();
+        const viewRight = tangentRight.clone().applyMatrix4(rotMatrixYaw).normalize();
+
+        const R = planetRadius;
         camera.up.copy(normal);
 
         if (cameraMode === 'first') {
@@ -19,8 +28,8 @@ const CameraModule = (() => {
             const eyePosition = player.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
             camera.position.copy(eyePosition);
 
-            const lookDir = player.forward.clone();
-            lookDir.applyAxisAngle(right, player.pitch);
+            const lookDir = viewForward.clone();
+            lookDir.applyAxisAngle(viewRight, player.pitch);
             const targetLookAt = eyePosition.clone().add(lookDir.multiplyScalar(player.weaponRange));
             camera.lookAt(targetLookAt);
 
@@ -32,10 +41,11 @@ const CameraModule = (() => {
             const codmPitch = Math.max(-0.6, Math.min(0.6, player.pitch));
             const pitchOffset = Math.sin(codmPitch) * 0.2;
 
+            // Posición de la cámara basada en la vista libre (yawOffset) y no en la dirección del cuerpo
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(baseHeight + pitchOffset))
-                .sub(player.forward.clone().multiplyScalar(baseDistance))
-                .add(right.clone().multiplyScalar(codmYawOffset));
+                .sub(viewForward.clone().multiplyScalar(baseDistance))
+                .add(viewRight.clone().multiplyScalar(codmYawOffset));
 
             const minAllowedRadius = R + 0.35;
             const camVectorFromCenter = camPos.clone().sub(planetCenter);
@@ -50,8 +60,8 @@ const CameraModule = (() => {
 
             camera.position.copy(camPos);
             
-            const lookDir = player.forward.clone();
-            lookDir.applyAxisAngle(right, codmPitch);
+            const lookDir = viewForward.clone();
+            lookDir.applyAxisAngle(viewRight, codmPitch);
             const lookTarget = player.position.clone().add(normal.clone().multiplyScalar(0.2)).add(lookDir.multiplyScalar(player.weaponRange));
             camera.lookAt(lookTarget);
 
@@ -63,7 +73,7 @@ const CameraModule = (() => {
 
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(rtsHeight))
-                .sub(player.forward.clone().multiplyScalar(rtsBack));
+                .sub(viewForward.clone().multiplyScalar(rtsBack));
 
             const minAllowedRadiusRTS = R + 0.5;
             const camVectorFromCenterRTS = camPos.clone().sub(planetCenter);
@@ -78,8 +88,8 @@ const CameraModule = (() => {
 
             camera.position.copy(camPos);
             
-            const lookDir = player.forward.clone();
-            lookDir.applyAxisAngle(right, rtsPitch);
+            const lookDir = viewForward.clone();
+            lookDir.applyAxisAngle(viewRight, rtsPitch);
             const targetLookAt = player.position.clone().add(normal.clone().multiplyScalar(0.1)).add(lookDir.multiplyScalar(player.weaponRange));
             camera.lookAt(targetLookAt);
         }
