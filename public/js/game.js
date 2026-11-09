@@ -158,7 +158,8 @@ const Game = {
     handleMouseMove(e) {
         const sensitivity = 0.003;
         this.localPlayer.yawOffset -= e.movementX * sensitivity;
-        this.localPlayer.pitch -= e.movementY * sensitivity;
+        // Corregido el signo vertical para que coincida perfectamente con la cámara e invertidos
+        this.localPlayer.pitch += e.movementY * sensitivity;
         this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
     },
 
