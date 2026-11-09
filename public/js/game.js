@@ -158,7 +158,10 @@ const Game = {
     handleMouseMove(e) {
         const sensitivity = 0.003;
         this.localPlayer.yawOffset -= e.movementX * sensitivity;
+        
+        // 🌟 Invertimos el eje vertical del ratón para que arriba sea mirar arriba y abajo mirar abajo
         this.localPlayer.pitch -= e.movementY * sensitivity;
+        
         this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
     },
 
@@ -347,18 +350,21 @@ const Game = {
             const planetGlobalCenter = new THREE.Vector3();
             if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
 
-            // 🌟 QUITAMOS LA ROTACIÓN AUTOMÁTICA DEL PLANETA SOBRE EL JUGADOR PARA QUE EL SUELO NO SE MUEVA A SUS PIES
-            // (Si el planeta rota visualmente, hazlo solo a nivel de escena/malla del planeta, no aplicando rotación al centro del jugador)
-
             let normal = p.position.clone().sub(planetGlobalCenter).normalize();
 
-            const refVector = Math.abs(normal.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-            const tangentRight = new THREE.Vector3().crossVectors(normal, refVector).normalize();
+            // 🌟 Usar un vector de referencia estable global (eje Y global) para evitar la inversión tipo espejo en los polos del planeta
+            const refVector = new THREE.Vector3(0, 1, 0);
+            let tangentRight = new THREE.Vector3().crossVectors(normal, refVector);
+            
+            // Si estamos exactamente en el polo, usamos otro vector de referencia para evitar singularidades
+            if (tangentRight.lengthSq() < 0.0001) {
+                tangentRight.crossVectors(normal, new THREE.Vector3(1, 0, 0));
+            }
+            tangentRight.normalize();
             const tangentForward = new THREE.Vector3().crossVectors(tangentRight, normal).normalize();
 
             const rotMatrixYaw = new THREE.Matrix4().makeRotationAxis(normal, p.yawOffset);
             const viewForward = tangentForward.clone().applyMatrix4(rotMatrixYaw).normalize();
-            // 🌟 Invertimos viewRight para corregir definitivamente el sentido de A y D
             const viewRight = tangentRight.clone().applyMatrix4(rotMatrixYaw).normalize().negate();
 
             let moveForward = 0;
