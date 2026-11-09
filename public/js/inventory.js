@@ -1,4 +1,4 @@
-// Módulo de Inventario con Stacks de 100, División con tecla C, Drag & Drop y Reactivación de Puntero (inventory.js)
+// Módulo de Inventario con Stacks de 100, División con tecla C, Drag & Drop y Sincornización de Red (inventory.js)
 const InventoryModule = (() => {
     const maxSlots = 20;
     const maxStackSize = 100;
@@ -12,6 +12,12 @@ const InventoryModule = (() => {
 
     function init() {
         createUI();
+    }
+
+    function syncWithServer() {
+        if (typeof GameModule !== 'undefined' && GameModule.socket) {
+            GameModule.socket.emit('updateInventory', { items: items });
+        }
     }
 
     function createUI() {
@@ -98,7 +104,6 @@ const InventoryModule = (() => {
                 }
             } else if (modalIsOpen && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
                 modal.style.display = 'none';
-                // 🌟 Reactivar el puntero al cerrar por movimiento
                 const canvas = document.getElementById('mapCanvas');
                 if (canvas && !document.pointerLockElement) {
                     canvas.requestPointerLock();
@@ -180,6 +185,7 @@ const InventoryModule = (() => {
                         items[targetIndex] = sourceItem;
                     }
                     renderGrid();
+                    syncWithServer();
                 }
             });
 
@@ -273,6 +279,7 @@ const InventoryModule = (() => {
         };
 
         renderGrid();
+        syncWithServer();
     }
 
     function addItem(type, amount) {
@@ -310,6 +317,7 @@ const InventoryModule = (() => {
         }
 
         renderGrid();
+        syncWithServer();
     }
 
     function autoSortInventory() {
@@ -346,6 +354,7 @@ const InventoryModule = (() => {
         });
 
         renderGrid();
+        syncWithServer();
     }
 
     function toggle() {
@@ -355,7 +364,6 @@ const InventoryModule = (() => {
         
         if (isOpen) {
             modal.style.display = 'none';
-            // 🌟 Reactivar automáticamente el bloqueo del puntero al cerrar el inventario
             const canvas = document.getElementById('mapCanvas');
             if (canvas && !document.pointerLockElement) {
                 canvas.requestPointerLock();
