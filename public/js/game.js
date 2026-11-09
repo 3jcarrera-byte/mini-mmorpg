@@ -24,7 +24,6 @@ const Game = {
     planetRadius: 5.0,
     gravity: 0.004,
     cameraMode: 'third',
-    isAiming: false,
     lastFrameTime: 0,
     currentPlanetKey: 'TEMPERATE_FOREST',
 
@@ -128,7 +127,6 @@ const Game = {
         this.localPlayer.altitude = 0;
         this.localPlayer.verticalVelocity = 0;
 
-        // Instanciar el avatar a través del nuevo módulo PlayerAvatarModule
         if (typeof PlayerAvatarModule !== 'undefined') {
             this.localPlayer.mesh = PlayerAvatarModule.create(this.localPlayer.alienRace, this.localPlayer.color).mesh;
         } else {
@@ -150,14 +148,6 @@ const Game = {
         if (typeof InputModule !== 'undefined') {
             InputModule.init(canvas);
         }
-
-        canvas.addEventListener('click', () => {
-            const inventoryModal = document.getElementById('inventory-modal');
-            const isInvOpen = inventoryModal && inventoryModal.style.display === 'block';
-            if (!isInvOpen && !document.pointerLockElement) {
-                canvas.requestPointerLock();
-            }
-        });
     },
 
     handleMouseMove(e) {
