@@ -10,15 +10,15 @@ const CameraModule = (() => {
 
         const normal = player.position.clone().sub(planetCenter).normalize();
         
-        // Calcular la base tangente estable en función de la normal
         const refVector = Math.abs(normal.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
         const tangentRight = new THREE.Vector3().crossVectors(normal, refVector).normalize();
         const tangentForward = new THREE.Vector3().crossVectors(tangentRight, normal).normalize();
 
-        // Aplicar el ángulo de rotación horizontal de la cámara (yawOffset)
         const rotMatrixYaw = new THREE.Matrix4().makeRotationAxis(normal, player.yawOffset || 0);
         const viewForward = tangentForward.clone().applyMatrix4(rotMatrixYaw).normalize();
-        const viewRight = tangentRight.clone().applyMatrix4(rotMatrixYaw).normalize();
+        
+        // 🌟 Invertir la base derecha para alinear correctamente los laterales en primera persona
+        const viewRight = tangentRight.clone().applyMatrix4(rotMatrixYaw).normalize().negate();
 
         const R = planetRadius;
         camera.up.copy(normal);
@@ -28,9 +28,9 @@ const CameraModule = (() => {
             const eyePosition = player.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
             camera.position.copy(eyePosition);
 
-            // Invertido el signo del pitch para que el movimiento vertical del crosshair coincida con el ratón
+            // 🌟 Eje vertical del ratón corregido para el crosshair y la vista
             const lookDir = viewForward.clone();
-            lookDir.applyAxisAngle(viewRight, -player.pitch);
+            lookDir.applyAxisAngle(viewRight, player.pitch);
             const targetLookAt = eyePosition.clone().add(lookDir.multiplyScalar(player.weaponRange));
             camera.lookAt(targetLookAt);
 
@@ -42,7 +42,6 @@ const CameraModule = (() => {
             const codmPitch = Math.max(-0.6, Math.min(0.6, player.pitch));
             const pitchOffset = Math.sin(codmPitch) * 0.2;
 
-            // Posición de la cámara basada en la vista libre (yawOffset)
             let camPos = player.position.clone()
                 .add(normal.clone().multiplyScalar(baseHeight + pitchOffset))
                 .sub(viewForward.clone().multiplyScalar(baseDistance))
@@ -61,14 +60,12 @@ const CameraModule = (() => {
 
             camera.position.copy(camPos);
             
-            // Invertido el signo de codmPitch para alinear el eje vertical con el ratón
             const lookDir = viewForward.clone();
-            lookDir.applyAxisAngle(viewRight, -codmPitch);
+            lookDir.applyAxisAngle(viewRight, codmPitch);
             const lookTarget = player.position.clone().add(normal.clone().multiplyScalar(0.2)).add(lookDir.multiplyScalar(player.weaponRange));
             camera.lookAt(lookTarget);
 
         } else if (cameraMode === 'rts') {
-            // 🌟 Altura y distancia óptimas y corregidas para vista cenital RTS estable
             const rtsHeight = 4.5; 
             const rtsBack = 3.0;   
             
@@ -85,7 +82,6 @@ const CameraModule = (() => {
 
             camera.position.copy(camPos);
             
-            // Vista cenital limpia apuntando al jugador
             const lookTarget = player.position.clone().add(normal.clone().multiplyScalar(0.2));
             camera.lookAt(lookTarget);
         }
