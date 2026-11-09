@@ -159,7 +159,7 @@ const Game = {
         const sensitivity = 0.003;
         this.localPlayer.yawOffset -= e.movementX * sensitivity;
         
-        // 🌟 Invertimos el eje vertical del ratón para que arriba sea mirar arriba y abajo mirar abajo
+        // 🌟 CORREGIDO DEFINITIVAMENTE: Restamos movementY para que el ratón hacia arriba mire arriba y hacia abajo mire abajo
         this.localPlayer.pitch -= e.movementY * sensitivity;
         
         this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
@@ -352,11 +352,9 @@ const Game = {
 
             let normal = p.position.clone().sub(planetGlobalCenter).normalize();
 
-            // 🌟 Usar un vector de referencia estable global (eje Y global) para evitar la inversión tipo espejo en los polos del planeta
             const refVector = new THREE.Vector3(0, 1, 0);
             let tangentRight = new THREE.Vector3().crossVectors(normal, refVector);
             
-            // Si estamos exactamente en el polo, usamos otro vector de referencia para evitar singularidades
             if (tangentRight.lengthSq() < 0.0001) {
                 tangentRight.crossVectors(normal, new THREE.Vector3(1, 0, 0));
             }
