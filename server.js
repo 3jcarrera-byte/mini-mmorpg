@@ -22,6 +22,11 @@ const charactersDB = {
     ]
 };
 
+// Base de datos simulada de inventarios por jugador (clave: socket.id o username)
+const playerInventories = {};
+const MAX_SLOTS = 20;
+const MAX_STACK_SIZE = 100;
+
 io.on('connection', (socket) => {
     let currentUser = null;
 
@@ -70,7 +75,6 @@ io.on('connection', (socket) => {
         }
 
         const initialLength = charactersDB[currentUser].length;
-        // Filtrar eliminando el personaje que coincida por id o _id (soporta formato numérico o string)
         charactersDB[currentUser] = charactersDB[currentUser].filter(c => 
             c.id.toString() !== characterId.toString() && 
             (c._id ? c._id.toString() !== characterId.toString() : true)
@@ -81,6 +85,83 @@ io.on('connection', (socket) => {
         }
 
         callback({ success: true, characters: charactersDB[currentUser] });
+    });
+
+    // Evento de inicialización del mundo e inventario al unirse al juego
+    socket.on('joinGame', (userData) => {
+        const playerId = socket.id;
+        
+        if (!playerInventories[playerId]) {
+            playerInventories[playerId] = Array(MAX_SLOTS).fill(null);
+            playerInventories[playerId][0] = { id: 1, type: 'wood', name: 'Madera', count: 100, icon: '🪵', color: '#e67e22' };
+            playerInventories[playerId][1] = { id: 2, type: 'stone', name: 'Piedra', count: 25, icon: '🪨', color: '#95a5a6' };
+        }
+
+        socket.emit('initWorld', { inventory: playerInventories[playerId] });
+    });
+
+    // Sincronización y validación segura del inventario del cliente
+    socket.on('updateInventory', (data) => {
+        const playerId = socket.id;
+        const incomingItems = data && data.items;
+
+        if (!Array.isArray(incomingItems) || incomingItems.length > MAX_SLOTS) {
+            socket.emit('serverNotification', { message: 'Inventario inválido.', type: 'error' });
+            return;
+        }
+
+        let isValid = true;
+        const allowedTypes = ['wood', 'stone'];
+
+        const validatedItems = incomingItems.map((item, index) => {
+            if (!item) return null;
+
+            if (!allowedTypes.includes(item.type)) {
+                isValid = false;
+            }
+
+            if (typeof item.count !== 'number' || item.count <= 0 || item.count > MAX_STACK_SIZE) {
+                isValid = false;
+            }
+
+            return {
+                id: item.id || Date.now() + index,
+                type: item.type,
+                name: item.name || item.type,
+                count: Math.min(Math.max(1, item.count), MAX_STACK_SIZE),
+                icon: item.icon || '📦',
+                color: item.color || '#ffffff'
+            };
+        });
+
+        if (!isValid) {
+            socket.emit('serverNotification', { message: 'Se detectaron anomalías en el inventario.', type: 'error' });
+            socket.emit('resourceUpdated', { inventory: playerInventories[playerId] });
+            return;
+        }
+
+        playerInventories[playerId] = validatedItems;
+
+        let woodTotal = 0;
+        let stoneTotal = 0;
+        validatedItems.forEach(item => {
+            if (item) {
+                if (item.type === 'wood') woodTotal += item.count;
+                if (item.type === 'stone') stoneTotal += item.count;
+            }
+        });
+
+        socket.emit('resourceUpdated', { wood: woodTotal, stone: stoneTotal });
+    });
+
+    // Sincronización de movimiento de jugadores en tiempo real (Esférico / Servidor)
+    socket.on('playerMove', (posData) => {
+        socket.broadcast.emit('remotePlayerMove', { id: socket.id, position: posData });
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`Jugador desconectado: ${socket.id}`);
+        delete playerInventories[socket.id];
     });
 });
 
