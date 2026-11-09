@@ -159,8 +159,8 @@ const Game = {
         const sensitivity = 0.003;
         this.localPlayer.yawOffset -= e.movementX * sensitivity;
         
-        // 🌟 CORREGIDO DEFINITIVAMENTE: Restamos movementY para que el ratón hacia arriba mire arriba y hacia abajo mire abajo
-        this.localPlayer.pitch -= e.movementY * sensitivity;
+        // 🌟 CORREGIDO DEFINITIVAMENTE: Sumamos movementY para que el ratón hacia arriba mire arriba y hacia abajo mire abajo
+        this.localPlayer.pitch += e.movementY * sensitivity;
         
         this.localPlayer.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.localPlayer.pitch));
     },
@@ -350,11 +350,11 @@ const Game = {
             const planetGlobalCenter = new THREE.Vector3();
             if (planetMesh) planetMesh.getWorldPosition(planetGlobalCenter);
 
+            // 1. DYNAMIC SURFACE ALIGNMENT
             let normal = p.position.clone().sub(planetGlobalCenter).normalize();
 
             const refVector = new THREE.Vector3(0, 1, 0);
             let tangentRight = new THREE.Vector3().crossVectors(normal, refVector);
-            
             if (tangentRight.lengthSq() < 0.0001) {
                 tangentRight.crossVectors(normal, new THREE.Vector3(1, 0, 0));
             }
@@ -373,6 +373,7 @@ const Game = {
             if (InputModule.isDown('KeyA') || InputModule.isDown('ArrowLeft')) { moveSide -= 1; isMoving = true; }
             if (InputModule.isDown('KeyD') || InputModule.isDown('ArrowRight')) { moveSide += 1; isMoving = true; }
 
+            // 3. LOCAL GRAVITY & JUMP
             if (InputModule.isDown('Space') && p.altitude <= 0.001) {
                 p.verticalVelocity = p.jumpSpeed;
             }
@@ -389,17 +390,19 @@ const Game = {
                 CrosshairModule.update(isMoving);
             }
 
-            const targetPos = p.position.clone();
+            // 2. PURE QUATERNION ROTATION
+            let targetPos = p.position.clone();
 
             if (isMoving) {
                 const moveDir = viewForward.clone().multiplyScalar(moveForward).add(viewRight.clone().multiplyScalar(moveSide)).normalize();
                 
                 const axis = new THREE.Vector3().crossVectors(normal, moveDir).normalize();
-                const angle = p.speed / R;
+                const rotationAngle = p.speed / R;
+                const movementQuaternion = new THREE.Quaternion().setFromAxisAngle(axis, rotationAngle);
                 
-                targetPos.sub(planetGlobalCenter);
-                targetPos.applyAxisAngle(axis, angle);
-                targetPos.add(planetGlobalCenter);
+                let relPos = targetPos.clone().sub(planetGlobalCenter);
+                relPos.applyQuaternion(movementQuaternion);
+                targetPos.copy(planetGlobalCenter).add(relPos);
 
                 p.forward.copy(moveDir);
             }
@@ -413,6 +416,7 @@ const Game = {
             normal = p.position.clone().sub(planetGlobalCenter).normalize();
             p.mesh.position.copy(p.position);
 
+            // 4. AVATAR ORIENTATION FIX
             const currentRight = new THREE.Vector3().crossVectors(p.forward, normal).normalize();
             const orthogonalForward = new THREE.Vector3().crossVectors(normal, currentRight).normalize();
             const rotMatrix = new THREE.Matrix4().makeBasis(currentRight, normal, orthogonalForward.clone().negate());
