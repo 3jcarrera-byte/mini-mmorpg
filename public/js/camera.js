@@ -10,15 +10,15 @@ const CameraModule = (() => {
 
         const normal = player.position.clone().sub(planetCenter).normalize();
         
+        // Base tangente estándar alineada a la esfera
         const refVector = Math.abs(normal.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
         const tangentRight = new THREE.Vector3().crossVectors(normal, refVector).normalize();
         const tangentForward = new THREE.Vector3().crossVectors(tangentRight, normal).normalize();
 
+        // Rotación horizontal (Yaw) de la cámara
         const rotMatrixYaw = new THREE.Matrix4().makeRotationAxis(normal, player.yawOffset || 0);
         const viewForward = tangentForward.clone().applyMatrix4(rotMatrixYaw).normalize();
-        
-        // 🌟 Invertir la base derecha para alinear correctamente los laterales en primera persona
-        const viewRight = tangentRight.clone().applyMatrix4(rotMatrixYaw).normalize().negate();
+        const viewRight = tangentRight.clone().applyMatrix4(rotMatrixYaw).normalize();
 
         const R = planetRadius;
         camera.up.copy(normal);
@@ -28,7 +28,7 @@ const CameraModule = (() => {
             const eyePosition = player.position.clone().add(normal.clone().multiplyScalar(eyeHeight));
             camera.position.copy(eyePosition);
 
-            // 🌟 Eje vertical del ratón corregido para el crosshair y la vista
+            // Primera persona: el ratón controla directamente la dirección de la mirada
             const lookDir = viewForward.clone();
             lookDir.applyAxisAngle(viewRight, player.pitch);
             const targetLookAt = eyePosition.clone().add(lookDir.multiplyScalar(player.weaponRange));
